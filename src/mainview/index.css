@@ -852,3 +852,31 @@ body {
 .modal:not(.hidden) .modal-content {
     animation: slideUp 0.2s ease;
 }
+
+/* ========== Update Banner ========== */
+.update-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 10px 24px;
+    background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+    color: white;
+    font-size: 0.875rem;
+    font-weight: 500;
+    flex-shrink: 0;
+}
+
+.update-banner .btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+}
+
+.update-banner .btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.update-banner .btn:disabled {
+    opacity: 0.7;
+}

@@ -10,6 +10,15 @@ interface SetupState {
   error?: string;
 }
 
+type UpdateStatus = 'checking' | 'update-available' | 'downloading' | 'update-ready' | 'no-update' | 'error';
+
+interface UpdateInfo {
+  status: UpdateStatus;
+  currentVersion: string;
+  newVersion?: string;
+  error?: string;
+}
+
 interface Voice {
   id: string;
   name: string;
@@ -64,12 +73,22 @@ type AppRPCSchema = {
         params: { method: string; path: string; body?: any };
         response: { status: number; data: any };
       };
+      getUpdateState: {
+        params: {};
+        response: UpdateInfo;
+      };
+      applyUpdate: {
+        params: {};
+        response: void;
+      };
     };
     messages: {};
   }>;
   webview: RPCSchema<{
     requests: {};
-    messages: {};
+    messages: {
+      updateStatus: UpdateInfo;
+    };
   }>;
 };
 
@@ -78,7 +97,11 @@ const rpc = Electroview.defineRPC<AppRPCSchema>({
   maxRequestTime: 60000,
   handlers: {
     requests: {},
-    messages: {},
+    messages: {
+      updateStatus: (info: UpdateInfo) => {
+        updateUpdateUI(info);
+      },
+    },
   },
 });
 
@@ -1107,6 +1130,64 @@ function setupModals() {
   });
 }
 
+// ========== Update UI ==========
+
+function updateUpdateUI(info: UpdateInfo) {
+  const banner = $("#update-banner");
+  const statusText = $("#update-status-text");
+  const updateBtn = $("#btn-apply-update") as HTMLButtonElement;
+
+  if (!banner || !statusText || !updateBtn) return;
+
+  switch (info.status) {
+    case 'checking':
+      hide(banner);
+      break;
+    case 'no-update':
+      hide(banner);
+      break;
+    case 'update-available':
+      statusText.textContent = `Version ${info.newVersion} is available`;
+      updateBtn.textContent = 'Downloading...';
+      updateBtn.disabled = true;
+      show(banner);
+      break;
+    case 'downloading':
+      statusText.textContent = `Downloading ${info.newVersion}...`;
+      updateBtn.textContent = 'Downloading...';
+      updateBtn.disabled = true;
+      show(banner);
+      break;
+    case 'update-ready':
+      statusText.textContent = `Version ${info.newVersion} is ready to install`;
+      updateBtn.textContent = 'Update Now';
+      updateBtn.disabled = false;
+      show(banner);
+      break;
+    case 'error':
+      hide(banner);
+      break;
+  }
+}
+
+async function applyUpdate() {
+  const updateBtn = $("#btn-apply-update") as HTMLButtonElement;
+  if (updateBtn) {
+    updateBtn.disabled = true;
+    updateBtn.textContent = 'Restarting...';
+  }
+
+  try {
+    await rpc.request.applyUpdate({});
+  } catch (e) {
+    console.error("Failed to apply update:", e);
+    if (updateBtn) {
+      updateBtn.disabled = false;
+      updateBtn.textContent = 'Update Now';
+    }
+  }
+}
+
 // ========== Event Listeners ==========
 
 function setupEventListeners() {
@@ -1145,6 +1226,9 @@ function setupEventListeners() {
 
   $("#btn-open-output")?.addEventListener("click", openOutputFolder);
   $("#btn-clear-output")?.addEventListener("click", clearAllOutputFiles);
+
+  // Update button
+  $("#btn-apply-update")?.addEventListener("click", applyUpdate);
 }
 
 // ========== Initialization ==========
@@ -1160,6 +1244,14 @@ async function init() {
 
   // Small delay to ensure RPC is ready
   await new Promise((resolve) => setTimeout(resolve, 500));
+
+  // Get initial update state
+  try {
+    const updateInfo = await rpc.request.getUpdateState({});
+    updateUpdateUI(updateInfo);
+  } catch (e) {
+    console.error("Failed to get update state:", e);
+  }
 
   await checkSetupStatus();
 

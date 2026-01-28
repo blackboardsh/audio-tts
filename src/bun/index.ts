@@ -1,8 +1,18 @@
-import { BrowserWindow, BrowserView, type RPCSchema } from "electrobun/bun";
+import { BrowserWindow, BrowserView, Updater, Utils, type RPCSchema } from "electrobun/bun";
 import { spawn, type Subprocess } from "bun";
 import { homedir } from "os";
 import { join } from "path";
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from "fs";
+
+// Update types
+type UpdateStatus = 'checking' | 'update-available' | 'downloading' | 'update-ready' | 'no-update' | 'error';
+
+interface UpdateInfo {
+  status: UpdateStatus;
+  currentVersion: string;
+  newVersion?: string;
+  error?: string;
+}
 
 // App configuration
 const APP_NAME = "Audio TTS";
@@ -38,6 +48,75 @@ let setupState: SetupState = {
   pythonInstalled: false,
   depsInstalled: false,
   backendRunning: false,
+};
+
+// Update state
+let updateState: UpdateInfo = {
+  status: 'checking',
+  currentVersion: '0.0.0',
+};
+
+// Reference to main window for broadcasting updates
+let mainWindowRef: BrowserWindow | null = null;
+
+// Broadcast update status to the UI
+const broadcastUpdateStatus = () => {
+  mainWindowRef?.webview.rpc?.send.updateStatus(updateState);
+};
+
+// Check for updates
+const checkForUpdate = async () => {
+  try {
+    const localInfo = await Updater.getLocallocalInfo();
+    updateState.currentVersion = localInfo.version;
+    updateState.status = 'checking';
+    broadcastUpdateStatus();
+
+    console.log(`Current version: ${localInfo.version} (${localInfo.channel})`);
+
+    const updateInfo = await Updater.checkForUpdate();
+
+    if (updateInfo.error) {
+      console.log(`Update check error: ${updateInfo.error}`);
+      updateState.status = 'error';
+      updateState.error = updateInfo.error;
+      broadcastUpdateStatus();
+      return;
+    }
+
+    if (updateInfo.updateAvailable) {
+      console.log(`Update available: ${updateInfo.version}`);
+      updateState.status = 'update-available';
+      updateState.newVersion = updateInfo.version;
+      broadcastUpdateStatus();
+
+      // Start downloading
+      updateState.status = 'downloading';
+      broadcastUpdateStatus();
+
+      await Updater.downloadUpdate();
+
+      if (Updater.updateInfo().updateReady) {
+        console.log("Update downloaded and ready to install");
+        updateState.status = 'update-ready';
+        broadcastUpdateStatus();
+      } else {
+        console.log("Update download failed");
+        updateState.status = 'error';
+        updateState.error = 'Download failed';
+        broadcastUpdateStatus();
+      }
+    } else {
+      console.log("No update available");
+      updateState.status = 'no-update';
+      broadcastUpdateStatus();
+    }
+  } catch (err: any) {
+    console.log(`Update check failed: ${err.message}`);
+    updateState.status = 'error';
+    updateState.error = err.message;
+    broadcastUpdateStatus();
+  }
 };
 
 // ========== Utility Functions ==========
@@ -380,12 +459,22 @@ type AppRPCSchema = {
         params: { method: string; path: string; body?: any };
         response: { status: number; data: any };
       };
+      getUpdateState: {
+        params: {};
+        response: UpdateInfo;
+      };
+      applyUpdate: {
+        params: {};
+        response: void;
+      };
     };
     messages: {};
   }>;
   webview: RPCSchema<{
     requests: {};
-    messages: {};
+    messages: {
+      updateStatus: UpdateInfo;
+    };
   }>;
 };
 
@@ -435,6 +524,15 @@ const rpc = BrowserView.defineRPC<AppRPCSchema>({
         const data = await response.json();
         return { status: response.status, data };
       },
+
+      getUpdateState: async () => {
+        return updateState;
+      },
+
+      applyUpdate: async () => {
+        console.log("Applying update...");
+        Updater.applyUpdate();
+      },
     },
     messages: {},
   },
@@ -458,10 +556,18 @@ const mainWindow = new BrowserWindow({
   rpc,
 });
 
+// Save reference for broadcasting updates
+mainWindowRef = mainWindow;
+
+// Send update status when DOM is ready
+mainWindow.webview.on("dom-ready", () => {
+  broadcastUpdateStatus();
+});
+
 // Handle window close
 mainWindow.on("close", async () => {
   await stopBackend();
-  process.exit(0);
+  Utils.quit();
 });
 
 // Start setup automatically
@@ -473,5 +579,8 @@ runSetup().then((state) => {
     console.log("Setup complete. Backend running on port", BACKEND_PORT);
   }
 });
+
+// Check for updates on startup
+checkForUpdate();
 
 console.log(`${APP_NAME} started!`);
