@@ -1,1 +1,51 @@
-# Add files to ignore here
+# Dependencies
+node_modules/
+
+# Build output
+build/
+dist/
+*.app
+
+# Electrobun
+.electrobun/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+.eggs/
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+.venv/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Lock files (keep bun.lock)
+package-lock.json
+yarn.lock

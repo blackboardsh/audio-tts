@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio TTS</title>
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Setup Screen -->
+        <div id="setup-screen" class="screen">
+            <div class="setup-container">
+                <h1>Audio TTS</h1>
+                <p class="subtitle">Voice Design & Text-to-Speech</p>
+
+                <div class="setup-progress">
+                    <div class="setup-step" id="step-uv">
+                        <span class="step-icon">&#9711;</span>
+                        <span class="step-label">Installing uv package manager</span>
+                    </div>
+                    <div class="setup-step" id="step-python">
+                        <span class="step-icon">&#9711;</span>
+                        <span class="step-label">Setting up Python 3.12</span>
+                    </div>
+                    <div class="setup-step" id="step-deps">
+                        <span class="step-icon">&#9711;</span>
+                        <span class="step-label">Installing dependencies</span>
+                    </div>
+                    <div class="setup-step" id="step-backend">
+                        <span class="step-icon">&#9711;</span>
+                        <span class="step-label">Starting backend server</span>
+                    </div>
+                </div>
+
+                <div id="setup-error" class="error-message hidden"></div>
+                <button id="retry-setup" class="btn btn-primary hidden">Retry Setup</button>
+            </div>
+        </div>
+
+        <!-- Main App Screen -->
+        <div id="main-screen" class="screen hidden">
+            <!-- Header -->
+            <header class="app-header">
+                <h1>Audio TTS</h1>
+                <div class="header-actions">
+                    <button id="btn-models" class="btn btn-secondary">Models</button>
+                    <span id="backend-status" class="status-indicator"></span>
+                </div>
+            </header>
+
+            <!-- Main Content -->
+            <div class="main-content">
+                <!-- Sidebar: Voice Library -->
+                <aside class="sidebar">
+                    <div class="sidebar-header">
+                        <h2>Voices</h2>
+                        <div class="sidebar-actions">
+                            <button id="btn-design-voice" class="btn btn-small btn-primary" title="Design Voice">+ Design</button>
+                            <button id="btn-clone-voice" class="btn btn-small btn-secondary" title="Clone Voice">+ Clone</button>
+                        </div>
+                    </div>
+                    <div id="voice-list" class="voice-list">
+                        <div class="empty-state">No voices yet. Design or clone a voice to get started.</div>
+                    </div>
+                </aside>
+
+                <!-- Main Panel -->
+                <main class="main-panel">
+                    <!-- Script Editor Tab -->
+                    <div class="panel-section">
+                        <div class="section-header">
+                            <h2>Script</h2>
+                            <div class="section-actions">
+                                <select id="language-select" class="select">
+                                    <option value="English">English</option>
+                                    <option value="Chinese">Chinese</option>
+                                    <option value="Japanese">Japanese</option>
+                                    <option value="Korean">Korean</option>
+                                    <option value="German">German</option>
+                                    <option value="French">French</option>
+                                    <option value="Spanish">Spanish</option>
+                                    <option value="Portuguese">Portuguese</option>
+                                    <option value="Russian">Russian</option>
+                                    <option value="Italian">Italian</option>
+                                </select>
+                            </div>
+                        </div>
+                        <textarea
+                            id="script-editor"
+                            class="script-editor"
+                            placeholder="Enter your script here. Each line or sentence will be generated as a separate audio clip.
+
+Example:
+Welcome to our product demo.
+Today we'll show you three amazing features.
+Let's get started!"
+                        ></textarea>
+                        <div class="editor-footer">
+                            <span id="line-count">0 lines</span>
+                            <div class="editor-actions">
+                                <button id="btn-split-sentences" class="btn btn-small btn-secondary">Split into sentences</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Generation Controls -->
+                    <div class="panel-section generation-controls">
+                        <div class="control-row">
+                            <div class="control-group">
+                                <label>Voice</label>
+                                <select id="voice-select" class="select">
+                                    <option value="">Default Voice</option>
+                                </select>
+                            </div>
+                            <div class="control-group">
+                                <label>Output Prefix</label>
+                                <input type="text" id="output-prefix" class="input" value="audio" placeholder="audio">
+                            </div>
+                            <button id="btn-generate" class="btn btn-primary btn-large">Generate Audio</button>
+                        </div>
+                        <div id="generation-progress" class="progress-container hidden">
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: 0%"></div>
+                            </div>
+                            <span class="progress-text">Generating...</span>
+                        </div>
+                    </div>
+
+                    <!-- Output Files -->
+                    <div class="panel-section output-section">
+                        <div class="section-header">
+                            <h2>Generated Audio</h2>
+                            <div class="section-actions">
+                                <button id="btn-open-output" class="btn btn-small btn-secondary">Open Folder</button>
+                                <button id="btn-clear-output" class="btn btn-small btn-danger">Clear All</button>
+                            </div>
+                        </div>
+                        <div id="output-list" class="output-list">
+                            <div class="empty-state">Generated audio files will appear here.</div>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        </div>
+
+        <!-- Voice Design Modal -->
+        <div id="voice-design-modal" class="modal hidden">
+            <div class="modal-overlay"></div>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Design a New Voice</h2>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Voice Name</label>
+                        <input type="text" id="design-voice-name" class="input" placeholder="e.g., Professional Narrator">
+                    </div>
+                    <div class="form-group">
+                        <label>Voice Description / Instructions</label>
+                        <textarea
+                            id="design-voice-instruction"
+                            class="textarea"
+                            placeholder="Describe the voice you want to create. Be specific about tone, age, gender, accent, and speaking style.
+
+Examples:
+- Young female voice, warm and friendly, slight American accent
+- Deep male voice, authoritative but calm, British accent
+- Energetic voice, enthusiastic and upbeat, perfect for product demos"
+                        ></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Sample Text (for generating reference audio)</label>
+                        <textarea
+                            id="design-voice-sample"
+                            class="textarea"
+                            placeholder="Enter a sample sentence that will be used to generate the voice. This will become the reference for cloning."
+                        >Hello, this is a sample of my voice. I hope you find it pleasant and easy to listen to.</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Language</label>
+                        <select id="design-voice-language" class="select">
+                            <option value="English">English</option>
+                            <option value="Chinese">Chinese</option>
+                            <option value="Japanese">Japanese</option>
+                            <option value="Korean">Korean</option>
+                            <option value="German">German</option>
+                            <option value="French">French</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary modal-cancel">Cancel</button>
+                    <button id="btn-create-design" class="btn btn-primary">Create Voice</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Voice Clone Modal -->
+        <div id="voice-clone-modal" class="modal hidden">
+            <div class="modal-overlay"></div>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Clone a Voice</h2>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Voice Name</label>
+                        <input type="text" id="clone-voice-name" class="input" placeholder="e.g., My Custom Voice">
+                    </div>
+                    <div class="form-group">
+                        <label>Reference Audio (3+ seconds recommended)</label>
+                        <div class="file-upload" id="clone-audio-upload">
+                            <input type="file" id="clone-audio-file" accept="audio/*" hidden>
+                            <div class="file-upload-content">
+                                <span class="file-upload-icon">&#128266;</span>
+                                <span class="file-upload-text">Click to select audio file or drag & drop</span>
+                            </div>
+                            <audio id="clone-audio-preview" controls class="hidden"></audio>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Reference Text (transcript of the audio)</label>
+                        <textarea
+                            id="clone-voice-text"
+                            class="textarea"
+                            placeholder="Enter the exact transcript of what is being said in the audio file. This helps the model understand the voice better."
+                        ></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary modal-cancel">Cancel</button>
+                    <button id="btn-create-clone" class="btn btn-primary">Clone Voice</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Models Modal -->
+        <div id="models-modal" class="modal hidden">
+            <div class="modal-overlay"></div>
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h2>Model Manager</h2>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p class="modal-description">Download and manage Qwen3-TTS models. The 1.7B models offer better quality, while 0.6B models are faster and use less memory.</p>
+                    <div id="models-list" class="models-list">
+                        <!-- Model cards will be inserted here -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="btn-unload-models" class="btn btn-secondary">Unload All Models</button>
+                    <button class="btn btn-primary modal-cancel">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Confirm Modal -->
+        <div id="confirm-modal" class="modal hidden">
+            <div class="modal-overlay"></div>
+            <div class="modal-content modal-small">
+                <div class="modal-header">
+                    <h3 id="confirm-modal-title">Confirm</h3>
+                </div>
+                <div class="modal-body">
+                    <p id="confirm-modal-message"></p>
+                </div>
+                <div class="modal-footer">
+                    <button id="confirm-modal-cancel" class="btn btn-secondary">Cancel</button>
+                    <button id="confirm-modal-ok" class="btn btn-danger">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="index.js"></script>
+</body>
+</html>
