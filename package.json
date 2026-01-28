@@ -1,6 +1,6 @@
 {
   "name": "audio-tts",
-  "version": "0.1.1-canary.0",
+  "version": "0.1.1",
   "description": "Desktop TTS app using Qwen3-TTS for voice design and cloning",
   "repository": {
     "type": "git",
