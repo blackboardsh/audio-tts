@@ -32,12 +32,42 @@ jobs:
             echo "Building stable release"
           fi
 
+      - name: Install Apple Certificate
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+        run: |
+          # Clean up any existing keychain from previous builds
+          security delete-keychain build.keychain || true
+
+          # Create temporary keychain
+          echo $MACOS_CERTIFICATE | base64 --decode > certificate.p12
+          security create-keychain -p actions build.keychain
+
+          # Add to search list so codesign can find it
+          security list-keychains -d user -s build.keychain $(security list-keychains -d user | sed s/\"//g)
+          security default-keychain -s build.keychain
+          security unlock-keychain -p actions build.keychain
+
+          # Import certificate with proper access
+          security import certificate.p12 -k build.keychain -P $MACOS_CERTIFICATE_PWD -T /usr/bin/codesign -T /usr/bin/productbuild
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k actions build.keychain
+
+          # Keep keychain unlocked for the entire session
+          security set-keychain-settings -lut 21600 build.keychain
+
+          # Verify certificate is accessible
+          echo "Available signing identities:"
+          security find-identity -v -p codesigning build.keychain
+
+          rm certificate.p12
+
       - name: Build app
         env:
           ELECTROBUN_DEVELOPER_ID: ${{ secrets.ELECTROBUN_DEVELOPER_ID }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ELECTROBUN_APPLEID: ${{ secrets.ELECTROBUN_APPLEID }}
+          ELECTROBUN_APPLEIDPASS: ${{ secrets.ELECTROBUN_APPLEIDPASS }}
+          ELECTROBUN_TEAMID: ${{ secrets.ELECTROBUN_TEAMID }}
         run: |
           if [ "${{ steps.build-env.outputs.env }}" = "canary" ]; then
             bun run build:canary
@@ -48,6 +78,11 @@ jobs:
       - name: List artifacts
         run: ls -la artifacts/
 
+      - name: Cleanup keychain
+        if: always()
+        run: |
+          security delete-keychain build.keychain || true
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
@@ -55,12 +90,6 @@ jobs:
             artifacts/*
           draft: false
           prerelease: ${{ steps.build-env.outputs.env == 'canary' }}
-          body: |
-            ## Downloads
-
-            - **DMG**: Download and mount to install
-            - **tar.zst**: Compressed app bundle for auto-updates
-
-            This release uses Electrobun's flat prefix-based artifact naming for GitHub Releases compatibility.
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

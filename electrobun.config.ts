@@ -3,7 +3,7 @@ import pkg from "./package.json";
 export default {
     app: {
         name: "Audio TTS",
-        identifier: "audio-tts.app",
+        identifier: "sh.blackboard.audio-tts",
         version: pkg.version,
     },
     build: {
@@ -20,14 +20,8 @@ export default {
         },
         mac: {
             bundleCEF: false,
-            codesign: false,
-            notarize: false,
-        },
-        linux: {
-            bundleCEF: false,
-        },
-        win: {
-            bundleCEF: false,
+            codesign: true,
+            notarize: true,
         },
     },
     release: {        
