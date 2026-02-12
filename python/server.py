@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Optional, List
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, BackgroundTasks
+from fastapi import FastAPI, Form, HTTPException, UploadFile, File, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
@@ -266,8 +266,8 @@ async def delete_voice(voice_id: str):
 
 @app.post("/voices/clone")
 async def clone_voice(
-    voice_name: str,
-    reference_text: str,
+    voice_name: str = Form(...),
+    reference_text: str = Form(...),
     audio_file: UploadFile = File(...)
 ):
     """Clone a voice from an audio sample."""
