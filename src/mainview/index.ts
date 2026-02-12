@@ -195,6 +195,8 @@ function setStepState(
 
 let voices: Voice[] = [];
 let selectedVoiceId: string | null = null;
+let currentlyPlayingAudio: HTMLAudioElement | null = null;
+let currentlyPlayingVoiceId: string | null = null;
 let models: Model[] = [];
 let outputFiles: OutputFile[] = [];
 let backendUrl = "";
@@ -298,7 +300,7 @@ function updateVoiceList() {
         <div class="voice-item-type">${voice.type === "designed" ? "Designed" : "Cloned"} - ${voice.language}</div>
       </div>
       <div class="voice-item-actions">
-        <button class="btn btn-icon btn-secondary voice-play-btn" title="Play sample">&#9654;</button>
+        <button class="btn btn-icon btn-secondary voice-play-btn" title="${voice.id === currentlyPlayingVoiceId ? "Stop" : "Play sample"}">${voice.id === currentlyPlayingVoiceId ? "\u25A0" : "\u25B6"}</button>
         <button class="btn btn-icon btn-danger voice-delete-btn" title="Delete">&times;</button>
       </div>
     </div>
@@ -365,14 +367,51 @@ function selectVoice(voiceId: string | null) {
   select.value = voiceId || "";
 }
 
+function stopVoiceSample() {
+  if (currentlyPlayingAudio) {
+    currentlyPlayingAudio.pause();
+    currentlyPlayingAudio.src = "";
+    currentlyPlayingAudio = null;
+  }
+  currentlyPlayingVoiceId = null;
+  updateVoiceList();
+}
+
 async function playVoiceSample(voiceId: string | null) {
   if (!voiceId) return;
+
+  // If already playing this voice, stop it
+  if (currentlyPlayingVoiceId === voiceId) {
+    stopVoiceSample();
+    return;
+  }
+
+  // Stop any currently playing sample
+  if (currentlyPlayingAudio) {
+    currentlyPlayingAudio.pause();
+    currentlyPlayingAudio.src = "";
+  }
 
   const voice = voices.find((v) => v.id === voiceId);
   if (!voice?.sample_audio_path) return;
 
-  const audio = new Audio(`${backendUrl}/audio/${voice.sample_audio_path.split("/").pop()}`);
-  audio.play().catch(console.error);
+  const audio = new Audio(`${backendUrl}/voices/audio/${voice.sample_audio_path.split("/").pop()}`);
+  currentlyPlayingAudio = audio;
+  currentlyPlayingVoiceId = voiceId;
+  updateVoiceList();
+
+  audio.addEventListener("ended", () => {
+    currentlyPlayingAudio = null;
+    currentlyPlayingVoiceId = null;
+    updateVoiceList();
+  });
+
+  audio.play().catch((err) => {
+    console.error(err);
+    currentlyPlayingAudio = null;
+    currentlyPlayingVoiceId = null;
+    updateVoiceList();
+  });
 }
 
 async function deleteVoice(voiceId: string | null) {

@@ -394,6 +394,20 @@ async def get_audio_file(filename: str):
     )
 
 
+@app.get("/voices/audio/{filename}")
+async def get_voice_audio_file(filename: str):
+    """Download a voice sample audio file."""
+    file_path = VOICES_DIR / filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    return FileResponse(
+        file_path,
+        media_type="audio/wav",
+        filename=filename
+    )
+
+
 @app.get("/output")
 async def list_output_files():
     """List all generated audio files."""
