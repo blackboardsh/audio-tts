@@ -199,6 +199,27 @@ let currentlyPlayingAudio: HTMLAudioElement | null = null;
 let currentlyPlayingVoiceId: string | null = null;
 let models: Model[] = [];
 let outputFiles: OutputFile[] = [];
+let builtInSpeakers: string[] = [];
+
+// ========== Model Slot State ==========
+
+type SlotStatus = "off" | "downloading" | "loading" | "loaded" | "error";
+
+interface SlotState {
+  currentSize: string;   // currently loaded size, or "off"
+  targetSize: string;    // what we're trying to reach, or "off"
+  status: SlotStatus;
+  statusText: string;
+  downloadTaskId: string | null;
+}
+
+const modelSlots: Record<string, SlotState> = {
+  base: { currentSize: "off", targetSize: "off", status: "off", statusText: "", downloadTaskId: null },
+  voice_design: { currentSize: "off", targetSize: "off", status: "off", statusText: "", downloadTaskId: null },
+  custom_voice: { currentSize: "off", targetSize: "off", status: "off", statusText: "", downloadTaskId: null },
+};
+
+let downloadedModelIds: Set<string> = new Set();
 let backendUrl = "";
 
 // ========== Setup Screen ==========
@@ -267,6 +288,9 @@ async function showMainScreen() {
   updateVoiceList();
   updateVoiceSelect();
   updateOutputList();
+
+  // Auto-load models from saved preferences
+  autoLoadFromPreferences();
 }
 
 // ========== Voice Management ==========
@@ -346,17 +370,79 @@ function updateVoiceList() {
 
 function updateVoiceSelect() {
   const select = $("#voice-select") as HTMLSelectElement;
+  const currentValue = select.value;
   select.innerHTML = '<option value="">Default Voice</option>';
 
-  voices.forEach((voice) => {
-    const option = document.createElement("option");
-    option.value = voice.id;
-    option.textContent = voice.name;
-    if (voice.id === selectedVoiceId) {
-      option.selected = true;
+  // Add built-in speakers from Instruct model
+  if (builtInSpeakers.length > 0) {
+    const group = document.createElement("optgroup");
+    group.label = "Built-in Speakers (Instruct)";
+    builtInSpeakers.forEach((speaker) => {
+      const option = document.createElement("option");
+      option.value = `speaker:${speaker}`;
+      option.textContent = speaker;
+      group.appendChild(option);
+    });
+    select.appendChild(group);
+  }
+
+  // Add cloned/designed voices
+  if (voices.length > 0) {
+    const group = document.createElement("optgroup");
+    group.label = "My Voices";
+    voices.forEach((voice) => {
+      const option = document.createElement("option");
+      option.value = voice.id;
+      option.textContent = voice.name;
+      group.appendChild(option);
+    });
+    select.appendChild(group);
+  }
+
+  // Restore selection
+  if (selectedVoiceId) {
+    select.value = selectedVoiceId;
+  } else if (currentValue) {
+    select.value = currentValue;
+  }
+
+  updateInstructionRow();
+}
+
+async function fetchSpeakers() {
+  try {
+    const response = await backendRequest<{ speakers: string[] }>("GET", "/models/speakers");
+    builtInSpeakers = response.speakers || [];
+  } catch (e) {
+    console.error("Failed to fetch speakers:", e);
+    builtInSpeakers = [];
+  }
+}
+
+function updateInstructionRow() {
+  const select = $("#voice-select") as HTMLSelectElement;
+  const row = $("#instruction-row")!;
+  const input = $("#voice-instruction") as HTMLInputElement;
+  const selectedValue = select.value;
+
+  const isBuiltInSpeaker = selectedValue.startsWith("speaker:");
+  const customVoiceSlot = modelSlots["custom_voice"];
+  const instructModelLoaded = customVoiceSlot.status === "loaded";
+
+  if (isBuiltInSpeaker && instructModelLoaded) {
+    show(row);
+    // 0.6B doesn't support instructions
+    const is06B = customVoiceSlot.currentSize === "0.6B";
+    input.disabled = is06B;
+    if (is06B) {
+      input.placeholder = "Instructions not supported with 0.6B model";
+      input.value = "";
+    } else {
+      input.placeholder = 'e.g. "Speak slowly and warmly" or "Sound excited and energetic"';
     }
-    select.appendChild(option);
-  });
+  } else {
+    hide(row);
+  }
 }
 
 function selectVoice(voiceId: string | null) {
@@ -365,6 +451,7 @@ function selectVoice(voiceId: string | null) {
 
   const select = $("#voice-select") as HTMLSelectElement;
   select.value = voiceId || "";
+  updateInstructionRow();
 }
 
 function stopVoiceSample() {
@@ -628,144 +715,292 @@ async function loadModels() {
       available: Model[];
       downloaded: string[];
       loaded: string[];
+      loaded_detail: Record<string, string>;
     }>("GET", "/models");
     models = response.available || [];
+
+    // Sync downloadedModelIds
+    downloadedModelIds = new Set(response.downloaded || []);
+
+    // Sync slot states from loaded_detail
+    const detail = response.loaded_detail || {};
+    for (const slotType of Object.keys(modelSlots)) {
+      const slot = modelSlots[slotType];
+      if (detail[slotType]) {
+        slot.currentSize = detail[slotType];
+        slot.targetSize = detail[slotType];
+        slot.status = "loaded";
+        slot.statusText = "";
+      } else if (slot.status === "loaded") {
+        // Was loaded but no longer
+        slot.currentSize = "off";
+        slot.targetSize = "off";
+        slot.status = "off";
+        slot.statusText = "";
+      }
+      updateSlotUI(slotType);
+    }
   } catch (e) {
     console.error("Failed to load models:", e);
     models = [];
   }
 }
 
-function openModelsModal() {
-  const modal = $("#models-modal")!;
-  show(modal);
-  updateModelsList();
+function getModelId(slotType: string, size: string): string | null {
+  const key = `${slotType}_${size}`;
+  const info = models.find(
+    (m) => m.type === slotType && m.size === size
+  );
+  return info?.id || null;
 }
 
-function closeModelsModal() {
-  hide("#models-modal");
+function updateSlotUI(slotType: string) {
+  const slot = modelSlots[slotType];
+  const container = document.querySelector(`.model-slot[data-slot="${slotType}"]`) as HTMLElement;
+  if (!container) return;
+
+  const btn = container.querySelector(".model-slot-btn") as HTMLElement;
+
+  // Clear state classes
+  container.classList.remove("slot-loaded", "slot-downloading", "slot-loading", "slot-error");
+
+  let label = "Off";
+  let spinnerHtml = "";
+
+  switch (slot.status) {
+    case "loaded":
+      label = slot.currentSize;
+      container.classList.add("slot-loaded");
+      break;
+    case "downloading":
+      label = slot.statusText || "...";
+      spinnerHtml = '<span class="slot-spinner"></span> ';
+      container.classList.add("slot-downloading");
+      break;
+    case "loading":
+      label = slot.statusText || "Loading...";
+      spinnerHtml = '<span class="slot-spinner"></span> ';
+      container.classList.add("slot-loading");
+      break;
+    case "error":
+      label = "Error";
+      container.classList.add("slot-error");
+      break;
+    default:
+      label = "Off";
+      break;
+  }
+
+  btn.innerHTML = `${spinnerHtml}${escapeHtml(label)} <span class="slot-arrow">&#9662;</span>`;
+
+  updateDropdownOptions(slotType);
 }
 
-// Track download/load states
-const modelStates: Map<string, { downloading: boolean; loading: boolean; progress: string }> = new Map();
+function updateDropdownOptions(slotType: string) {
+  const slot = modelSlots[slotType];
+  const dropdown = document.querySelector(`.model-slot-dropdown[data-slot="${slotType}"]`);
+  if (!dropdown) return;
 
-function updateModelsList() {
-  const container = $("#models-list")!;
+  dropdown.querySelectorAll(".dropdown-option").forEach((opt) => {
+    const size = (opt as HTMLElement).getAttribute("data-size")!;
+    opt.classList.remove("active");
 
-  if (models.length === 0) {
-    container.innerHTML =
-      '<div class="empty-state">No models available</div>';
+    // Remove old download hint
+    const oldHint = opt.querySelector(".download-hint");
+    if (oldHint) oldHint.remove();
+
+    if (size === "off") {
+      if (slot.status === "off") opt.classList.add("active");
+    } else {
+      // Check if active
+      if (slot.status === "loaded" && slot.currentSize === size) {
+        opt.classList.add("active");
+      }
+      // Check if needs download
+      const modelId = getModelId(slotType, size);
+      if (modelId && !downloadedModelIds.has(modelId)) {
+        const hint = document.createElement("span");
+        hint.className = "download-hint";
+        hint.textContent = "(download)";
+        opt.appendChild(hint);
+      }
+    }
+  });
+}
+
+function toggleDropdown(slotType: string) {
+  const dropdown = document.querySelector(`.model-slot-dropdown[data-slot="${slotType}"]`) as HTMLElement;
+  if (!dropdown) return;
+
+  const isOpen = !dropdown.classList.contains("hidden");
+  // Close all dropdowns first
+  document.querySelectorAll(".model-slot-dropdown").forEach((d) => d.classList.add("hidden"));
+
+  if (!isOpen) {
+    updateDropdownOptions(slotType);
+    dropdown.classList.remove("hidden");
+  }
+}
+
+async function onSlotSelectionChange(slotType: string, newSize: string) {
+  const slot = modelSlots[slotType];
+
+  // Close dropdown
+  document.querySelectorAll(".model-slot-dropdown").forEach((d) => d.classList.add("hidden"));
+
+  // If already at this state, do nothing
+  if (newSize === "off" && slot.status === "off") return;
+  if (slot.status === "loaded" && slot.currentSize === newSize) return;
+
+  // If busy, ignore
+  if (slot.status === "downloading" || slot.status === "loading") return;
+
+  if (newSize === "off") {
+    // Unload
+    slot.targetSize = "off";
+    slot.status = "loading";
+    slot.statusText = "Unloading...";
+    updateSlotUI(slotType);
+
+    try {
+      await backendRequest("POST", `/models/unload/${slotType}`);
+      slot.currentSize = "off";
+      slot.status = "off";
+      slot.statusText = "";
+      saveSlotPreferences();
+
+      // Clear speakers when Instruct model is unloaded
+      if (slotType === "custom_voice") {
+        builtInSpeakers = [];
+        // Reset voice select if a built-in speaker was selected
+        const voiceSelect = $("#voice-select") as HTMLSelectElement;
+        if (voiceSelect.value.startsWith("speaker:")) {
+          voiceSelect.value = "";
+        }
+        updateVoiceSelect();
+      }
+    } catch (e) {
+      console.error(`Failed to unload ${slotType}:`, e);
+      slot.status = "error";
+      slot.statusText = "Unload failed";
+    }
+    updateSlotUI(slotType);
     return;
   }
 
-  const displayModels = models.filter((m) => m.type !== "tokenizer");
+  // Load (possibly after download)
+  slot.targetSize = newSize;
+  const modelId = getModelId(slotType, newSize);
+  if (!modelId) {
+    console.error(`No model found for ${slotType} ${newSize}`);
+    return;
+  }
 
-  container.innerHTML = displayModels
-    .map(
-      (model) => {
-        const state = modelStates.get(model.id) || { downloading: false, loading: false, progress: "" };
-
-        let actionsHtml = "";
-        if (state.downloading) {
-          actionsHtml = `<span class="model-card-status downloading">Downloading... ${state.progress}</span>`;
-        } else if (state.loading) {
-          actionsHtml = `<span class="model-card-status loading">Loading model...</span>`;
-        } else if (model.downloaded) {
-          if (model.loaded) {
-            actionsHtml = '<span class="model-card-status loaded">Loaded</span>';
-          } else {
-            actionsHtml = `<button class="btn btn-small btn-primary model-load-btn">Load</button>
-               <span class="model-card-status downloaded">Downloaded</span>`;
-          }
-        } else {
-          actionsHtml = `<button class="btn btn-small btn-secondary model-download-btn">Download</button>`;
-        }
-
-        return `
-    <div class="model-card" data-model-id="${model.id}">
-      <div class="model-card-header">
-        <span class="model-card-title">${escapeHtml(model.name)}</span>
-        <span class="model-card-size">${model.size}</span>
-      </div>
-      <div class="model-card-description">${escapeHtml(model.description)}</div>
-      <div class="model-card-capabilities">
-        ${model.capabilities.map((c) => `<span class="capability-tag">${c}</span>`).join("")}
-      </div>
-      <div class="model-card-actions">
-        ${actionsHtml}
-      </div>
-    </div>
-  `;
-      }
-    )
-    .join("");
-
-  container.querySelectorAll(".model-download-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const modelId = (btn.closest(".model-card") as HTMLElement)?.getAttribute(
-        "data-model-id"
-      );
-      downloadModel(modelId);
-    });
-  });
-
-  container.querySelectorAll(".model-load-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const modelId = (btn.closest(".model-card") as HTMLElement)?.getAttribute(
-        "data-model-id"
-      );
-      loadModel(modelId);
-    });
-  });
+  await downloadAndLoadSlot(slotType, newSize, modelId);
 }
 
-async function downloadModel(modelId: string | null) {
-  if (!modelId) return;
-
-  const model = models.find((m) => m.id === modelId);
-  if (!model) return;
-
-  // Set downloading state
-  modelStates.set(modelId, { downloading: true, loading: false, progress: "Starting..." });
-  updateModelsList();
+async function downloadAndLoadSlot(slotType: string, size: string, modelId: string) {
+  const slot = modelSlots[slotType];
 
   try {
-    // Download tokenizer first if needed
+    // Download tokenizer if needed
     const tokenizer = models.find((m) => m.type === "tokenizer");
-    if (tokenizer && !tokenizer.downloaded) {
-      modelStates.set(modelId, { downloading: true, loading: false, progress: "Downloading tokenizer..." });
-      updateModelsList();
-      const tokenizerResult = await backendRequest<{ task_id: string }>("POST", "/models/download", {
+    if (tokenizer && !downloadedModelIds.has(tokenizer.id)) {
+      slot.status = "downloading";
+      slot.statusText = "Tokenizer...";
+      updateSlotUI(slotType);
+
+      const tokResult = await backendRequest<{ task_id: string }>("POST", "/models/download", {
         model_id: tokenizer.id,
       });
-      // Wait for tokenizer download to complete
-      await pollDownloadProgress(tokenizer.id, tokenizerResult.task_id, (progress) => {
-        modelStates.set(modelId, { downloading: true, loading: false, progress: `Tokenizer: ${progress}` });
-        updateModelsList();
+      await pollDownloadProgress(tokenizer.id, tokResult.task_id, (progress) => {
+        slot.statusText = `Tok: ${progress}`;
+        updateSlotUI(slotType);
       });
+      downloadedModelIds.add(tokenizer.id);
     }
 
-    // Start model download
-    modelStates.set(modelId, { downloading: true, loading: false, progress: "Starting download..." });
-    updateModelsList();
+    // Download model if needed
+    if (!downloadedModelIds.has(modelId)) {
+      slot.status = "downloading";
+      slot.statusText = `DL ${size}`;
+      updateSlotUI(slotType);
 
-    const result = await backendRequest<{ task_id: string }>("POST", "/models/download", { model_id: modelId });
+      const dlResult = await backendRequest<{ task_id: string }>("POST", "/models/download", {
+        model_id: modelId,
+      });
+      slot.downloadTaskId = dlResult.task_id;
 
-    // Poll for progress
-    await pollDownloadProgress(modelId, result.task_id, (progress) => {
-      modelStates.set(modelId, { downloading: true, loading: false, progress });
-      updateModelsList();
+      await pollDownloadProgress(modelId, dlResult.task_id, (progress) => {
+        slot.statusText = progress;
+        updateSlotUI(slotType);
+      });
+      downloadedModelIds.add(modelId);
+      slot.downloadTaskId = null;
+    }
+
+    // Load the model
+    await loadSlot(slotType, size);
+  } catch (e: any) {
+    console.error(`Failed to download/load ${slotType} ${size}:`, e);
+    slot.status = "error";
+    slot.statusText = "Failed";
+    slot.downloadTaskId = null;
+    updateSlotUI(slotType);
+  }
+}
+
+async function loadSlot(slotType: string, size: string) {
+  const slot = modelSlots[slotType];
+
+  // Unload current if different size is loaded
+  if (slot.status === "loaded" && slot.currentSize !== size) {
+    slot.status = "loading";
+    slot.statusText = "Swapping...";
+    updateSlotUI(slotType);
+
+    await backendRequest("POST", `/models/unload/${slotType}`);
+  }
+
+  slot.status = "loading";
+  slot.statusText = `Loading ${size}...`;
+  updateSlotUI(slotType);
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 600000);
+
+    const response = await fetch(`${backendUrl}/models/load`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model_type: slotType, model_size: size }),
+      signal: controller.signal,
     });
 
-    // Download complete
-    modelStates.delete(modelId);
-    await loadModels();
-    updateModelsList();
-  } catch (e) {
-    console.error("Failed to download:", e);
-    modelStates.delete(modelId);
-    updateModelsList();
-    alert(`Failed to download: ${e}`);
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || "Load failed");
+    }
+
+    slot.currentSize = size;
+    slot.targetSize = size;
+    slot.status = "loaded";
+    slot.statusText = "";
+    saveSlotPreferences();
+    updateSlotUI(slotType);
+
+    // Fetch speakers when Instruct model loads
+    if (slotType === "custom_voice") {
+      await fetchSpeakers();
+      updateVoiceSelect();
+    }
+  } catch (e: any) {
+    console.error(`Failed to load ${slotType} ${size}:`, e);
+    slot.status = "error";
+    slot.statusText = e.name === "AbortError" ? "Timeout" : "Load failed";
+    updateSlotUI(slotType);
   }
 }
 
@@ -799,14 +1034,12 @@ async function pollDownloadProgress(
           return;
         }
 
-        // Show progress
         if (progress.total_files > 0) {
           onProgress(`${progress.files_completed}/${progress.total_files} files`);
         } else {
           onProgress(progress.status === "downloading" ? "Downloading..." : progress.status);
         }
       } catch (e) {
-        // Check if model is now downloaded by refreshing models list
         await loadModels();
         const model = models.find((m) => m.id === modelId);
         if (model?.downloaded) {
@@ -820,66 +1053,67 @@ async function pollDownloadProgress(
   });
 }
 
-async function loadModel(modelId: string | null) {
-  if (!modelId) return;
+// ========== Slot Preferences ==========
 
-  const model = models.find((m) => m.id === modelId);
-  if (!model) return;
+function saveSlotPreferences() {
+  const prefs: Record<string, string> = {};
+  for (const [type, slot] of Object.entries(modelSlots)) {
+    prefs[type] = slot.status === "loaded" ? slot.currentSize : "off";
+  }
+  localStorage.setItem("modelSlotPrefs", JSON.stringify(prefs));
+}
 
-  // Set loading state
-  modelStates.set(modelId, { downloading: false, loading: true, progress: "" });
-  updateModelsList();
-
-  console.log(`Loading model ${modelId}...`);
-
+function getSlotPreferences(): Record<string, string> {
   try {
-    // Use a longer timeout for model loading - it can take minutes
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minute timeout
+    const raw = localStorage.getItem("modelSlotPrefs");
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return {};
+}
 
-    const response = await fetch(`${backendUrl}/models/load`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model_type: model.type,
-        model_size: model.size,
-      }),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || "Load failed");
-    }
-
-    const result = await response.json();
-    console.log("Model loaded:", result);
-
-    modelStates.delete(modelId);
-    await loadModels();
-    updateModelsList();
-  } catch (e: any) {
-    console.error("Failed to load model:", e);
-    modelStates.delete(modelId);
-    updateModelsList();
-    if (e.name === "AbortError") {
-      alert("Model loading timed out. The model may still be loading in the background.");
-    } else {
-      alert(`Failed to load model: ${e.message || e}`);
+async function autoLoadFromPreferences() {
+  const prefs = getSlotPreferences();
+  // Only auto-load the base model; Design and Instruct reset to off on launch
+  const baseSize = prefs["base"];
+  if (baseSize && baseSize !== "off" && modelSlots["base"]) {
+    const slot = modelSlots["base"];
+    if (slot.status !== "loaded" || slot.currentSize !== baseSize) {
+      try {
+        await onSlotSelectionChange("base", baseSize);
+      } catch (e) {
+        console.error("Auto-load failed for base:", e);
+      }
     }
   }
 }
 
-async function unloadAllModels() {
-  try {
-    await backendRequest("POST", "/models/unload");
-    await loadModels();
-    updateModelsList();
-  } catch (e) {
-    console.error("Failed to unload models:", e);
-  }
+// ========== Dropdown Event Wiring ==========
+
+function setupDropdowns() {
+  // Button clicks toggle dropdown
+  document.querySelectorAll(".model-slot-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const slotType = (btn as HTMLElement).getAttribute("data-slot")!;
+      toggleDropdown(slotType);
+    });
+  });
+
+  // Option clicks
+  document.querySelectorAll(".dropdown-option").forEach((opt) => {
+    opt.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const dropdown = (opt as HTMLElement).closest(".model-slot-dropdown") as HTMLElement;
+      const slotType = dropdown.getAttribute("data-slot")!;
+      const size = (opt as HTMLElement).getAttribute("data-size")!;
+      onSlotSelectionChange(slotType, size);
+    });
+  });
+
+  // Click outside closes dropdowns
+  document.addEventListener("click", () => {
+    document.querySelectorAll(".model-slot-dropdown").forEach((d) => d.classList.add("hidden"));
+  });
 }
 
 // ========== Script Editor ==========
@@ -922,10 +1156,17 @@ async function generateAudio() {
   }
 
   const voiceSelect = $("#voice-select") as HTMLSelectElement;
-  const voiceId = voiceSelect.value || null;
+  const voiceValue = voiceSelect.value;
+  const isBuiltInSpeaker = voiceValue.startsWith("speaker:");
+  const speakerName = isBuiltInSpeaker ? voiceValue.slice("speaker:".length) : null;
+  const voiceId = isBuiltInSpeaker ? null : (voiceValue || null);
 
   const languageSelect = $("#language-select") as HTMLSelectElement;
   const language = languageSelect.value;
+
+  const instructionInput = $("#voice-instruction") as HTMLInputElement;
+  const instruction = (isBuiltInSpeaker && !instructionInput.disabled && instructionInput.value.trim())
+    ? instructionInput.value.trim() : null;
 
   const prefixInput = $("#output-prefix") as HTMLInputElement;
   const prefix = prefixInput.value.trim() || "audio";
@@ -953,6 +1194,8 @@ async function generateAudio() {
         text: lines[0],
         language,
         voice_id: voiceId,
+        speaker: speakerName,
+        instruction,
       });
 
       progressFill.style.width = "100%";
@@ -964,6 +1207,8 @@ async function generateAudio() {
         texts: lines,
         language,
         voice_id: voiceId,
+        speaker: speakerName,
+        instruction,
         output_prefix: prefix,
       });
 
@@ -1255,11 +1500,16 @@ function setupEventListeners() {
 
   $("#voice-select")?.addEventListener("change", (e) => {
     const select = e.target as HTMLSelectElement;
-    selectVoice(select.value || null);
+    const value = select.value;
+    // Built-in speakers don't use selectVoice (they aren't voice profiles)
+    if (value.startsWith("speaker:")) {
+      selectedVoiceId = null;
+      updateVoiceList();
+    } else {
+      selectVoice(value || null);
+    }
+    updateInstructionRow();
   });
-
-  $("#btn-models")?.addEventListener("click", openModelsModal);
-  $("#btn-unload-models")?.addEventListener("click", unloadAllModels);
 
   $("#btn-generate")?.addEventListener("click", generateAudio);
 
@@ -1278,6 +1528,7 @@ async function init() {
   setupModals();
   setupConfirmModal();
   setupEventListeners();
+  setupDropdowns();
   setupScriptEditor();
   setupCloneAudioUpload();
 

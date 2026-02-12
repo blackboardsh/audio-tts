@@ -380,6 +380,21 @@ body {
     color: var(--text-secondary);
 }
 
+.instruction-row {
+    margin-top: 12px;
+}
+
+.label-hint {
+    font-weight: normal;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+#voice-instruction:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .progress-container {
     margin-top: 16px;
 }
@@ -700,107 +715,112 @@ body {
     border-top: 1px solid var(--border-color);
 }
 
-/* ========== Models List ========== */
-.models-list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.model-card {
-    background: var(--bg-tertiary);
-    border-radius: var(--border-radius);
-    padding: 16px;
-}
-
-.model-card-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    margin-bottom: 8px;
-}
-
-.model-card-title {
-    font-weight: 600;
-    font-size: 0.95rem;
-}
-
-.model-card-size {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    background: var(--bg-secondary);
-    padding: 2px 8px;
-    border-radius: 4px;
-}
-
-.model-card-description {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-    margin-bottom: 12px;
-}
-
-.model-card-capabilities {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin-bottom: 12px;
-}
-
-.capability-tag {
-    font-size: 0.7rem;
-    padding: 2px 8px;
-    border-radius: 4px;
-    background: rgba(99, 102, 241, 0.2);
-    color: var(--accent-primary);
-}
-
-.model-card-actions {
-    display: flex;
-    gap: 8px;
-}
-
-.model-card-status {
+/* ========== Model Slot Dropdowns ========== */
+.model-slot {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 0.8rem;
+    gap: 4px;
+}
+
+.model-slot-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+}
+
+.model-slot-btn {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
     color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-weight: 500;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: var(--transition);
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 4px;
 }
 
-.model-card-status.downloaded {
+.model-slot-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--text-muted);
+}
+
+.slot-arrow {
+    font-size: 0.65rem;
+    opacity: 0.6;
+}
+
+.model-slot.slot-loaded .model-slot-btn {
     color: var(--accent-success);
+    border-color: var(--accent-success);
 }
 
-.model-card-status.loaded {
-    color: var(--accent-primary);
-}
-
-.model-card-status.downloading {
+.model-slot.slot-downloading .model-slot-btn,
+.model-slot.slot-loading .model-slot-btn {
     color: var(--accent-warning);
+    border-color: var(--accent-warning);
 }
 
-.model-card-status.downloading::before {
-    content: "";
-    width: 12px;
-    height: 12px;
-    border: 2px solid var(--accent-warning);
+.model-slot.slot-error .model-slot-btn {
+    color: var(--accent-danger);
+    border-color: var(--accent-danger);
+}
+
+.slot-spinner {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border: 2px solid currentColor;
     border-top-color: transparent;
     border-radius: 50%;
-    animation: spin 1s linear infinite;
+    animation: spin 0.8s linear infinite;
 }
 
-.model-card-status.loading {
-    color: var(--accent-secondary);
+.model-slot-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 4px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    min-width: 130px;
+    z-index: 100;
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
 }
 
-.model-card-status.loading::before {
-    content: "";
-    width: 12px;
-    height: 12px;
-    border: 2px solid var(--accent-secondary);
-    border-top-color: transparent;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
+.dropdown-option {
+    padding: 8px 14px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: var(--transition);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.dropdown-option:hover {
+    background: var(--bg-hover);
+}
+
+.dropdown-option.active {
+    color: var(--accent-success);
+    font-weight: 600;
+}
+
+.dropdown-option .download-hint {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-left: 8px;
 }
 
 @keyframes spin {

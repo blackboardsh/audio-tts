@@ -132,6 +132,9 @@ class TTSService:
         self.custom_voice_model = None
         self.tokenizer = None
 
+        # Track which size is loaded per model type
+        self._loaded_model_sizes: Dict[str, str] = {}
+
         # Voice profiles cache
         self.voice_profiles: Dict[str, VoiceProfile] = {}
         self.voice_clone_prompts: Dict[str, Any] = {}
@@ -456,6 +459,7 @@ class TTSService:
             self.custom_voice_model = model
             logger.info("Assigned to custom_voice_model slot")
 
+        self._loaded_model_sizes[model_type] = model_size
         logger.info(f"=== Model {model_id} loaded successfully ===")
         return model_id
 
@@ -466,6 +470,7 @@ class TTSService:
         self.custom_voice_model = None
         self.tokenizer = None
         self.voice_clone_prompts.clear()
+        self._loaded_model_sizes.clear()
 
         # Force garbage collection
         import gc
@@ -474,6 +479,35 @@ class TTSService:
             torch.cuda.empty_cache()
 
         logger.info("All models unloaded")
+
+    def unload_model(self, model_type: str):
+        """Unload a single model slot."""
+        if model_type == "base":
+            self.base_model = None
+            self.voice_clone_prompts.clear()
+        elif model_type == "voice_design":
+            self.voice_design_model = None
+        elif model_type == "custom_voice":
+            self.custom_voice_model = None
+        else:
+            raise ValueError(f"Unknown model type: {model_type}")
+
+        self._loaded_model_sizes.pop(model_type, None)
+
+        # Unload tokenizer if no models remain loaded
+        if not any([self.base_model, self.voice_design_model, self.custom_voice_model]):
+            self.tokenizer = None
+
+        import gc
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+        logger.info(f"Model slot '{model_type}' unloaded")
+
+    def get_loaded_models_detail(self) -> Dict[str, str]:
+        """Return mapping of model_type -> loaded size (e.g. {'base': '1.7B'})."""
+        return dict(self._loaded_model_sizes)
 
     def list_voices(self) -> List[dict]:
         """List all saved voice profiles."""
@@ -612,6 +646,78 @@ class TTSService:
 
         logger.info(f"Voice designed: {voice_name} ({voice_id})")
         return profile
+
+    def get_speakers(self) -> List[str]:
+        """Get list of predefined speakers from the custom voice model."""
+        if self.custom_voice_model is None:
+            return []
+        try:
+            return list(self.custom_voice_model.get_supported_speakers())
+        except Exception as e:
+            logger.error(f"Failed to get speakers: {e}")
+            return []
+
+    def generate_custom(
+        self,
+        text: str,
+        speaker: str,
+        language: str = "English",
+        instruction: Optional[str] = None
+    ) -> Path:
+        """Generate audio using the custom voice model with a predefined speaker."""
+        if self.custom_voice_model is None:
+            raise RuntimeError("Custom voice model not loaded.")
+
+        output_filename = f"output_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}.wav"
+        output_path = self.output_dir / output_filename
+
+        kwargs = {
+            "text": text,
+            "speaker": speaker,
+            "language": language,
+        }
+        if instruction:
+            kwargs["instruct"] = instruction
+
+        wavs, sr = self.custom_voice_model.generate_custom_voice(**kwargs)
+        sf.write(str(output_path), wavs[0], sr)
+        logger.info(f"Generated custom voice audio: {output_path}")
+
+        return output_path
+
+    def batch_generate_custom(
+        self,
+        texts: List[str],
+        speaker: str,
+        language: str = "English",
+        instruction: Optional[str] = None,
+        output_prefix: str = "audio"
+    ) -> List[Path]:
+        """Batch generate audio using the custom voice model with a predefined speaker."""
+        if self.custom_voice_model is None:
+            raise RuntimeError("Custom voice model not loaded.")
+
+        output_paths = []
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+        kwargs = {
+            "text": texts,
+            "speaker": [speaker] * len(texts),
+            "language": [language] * len(texts),
+        }
+        if instruction:
+            kwargs["instruct"] = [instruction] * len(texts)
+
+        wavs, sr = self.custom_voice_model.generate_custom_voice(**kwargs)
+
+        for i, wav in enumerate(wavs):
+            output_filename = f"{output_prefix}_{timestamp}_{i+1:03d}.wav"
+            output_path = self.output_dir / output_filename
+            sf.write(str(output_path), wav, sr)
+            output_paths.append(output_path)
+            logger.info(f"Generated custom voice audio: {output_path}")
+
+        return output_paths
 
     def _get_voice_clone_prompt(self, voice_id: str) -> Any:
         """Get or recreate voice clone prompt."""

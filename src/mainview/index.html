@@ -50,7 +50,32 @@
             <header class="app-header">
                 <h1>Audio TTS</h1>
                 <div class="header-actions">
-                    <button id="btn-models" class="btn btn-secondary">Models</button>
+                    <div class="model-slot" data-slot="base" title="Required for all audio generation and voice cloning. Keep this loaded whenever you're working.">
+                        <span class="model-slot-label">Base Text to Speech</span>
+                        <button class="model-slot-btn" data-slot="base">Off <span class="slot-arrow">&#9662;</span></button>
+                        <div class="model-slot-dropdown hidden" data-slot="base">
+                            <div class="dropdown-option" data-size="off">Off</div>
+                            <div class="dropdown-option" data-size="0.6B">0.6B</div>
+                            <div class="dropdown-option" data-size="1.7B">1.7B</div>
+                        </div>
+                    </div>
+                    <div class="model-slot" data-slot="voice_design" title="Only needed when creating a new voice from a text description. Can be turned off after the voice is saved.">
+                        <span class="model-slot-label">Create Voice Design/Clone</span>
+                        <button class="model-slot-btn" data-slot="voice_design">Off <span class="slot-arrow">&#9662;</span></button>
+                        <div class="model-slot-dropdown hidden" data-slot="voice_design">
+                            <div class="dropdown-option" data-size="off">Off</div>
+                            <div class="dropdown-option" data-size="1.7B">1.7B</div>
+                        </div>
+                    </div>
+                    <div class="model-slot" data-slot="custom_voice" title="Predefined speaker voices with optional instruction control (1.7B only). A separate generation path that doesn't require the Base model.">
+                        <span class="model-slot-label">Built-in Instruct Voices</span>
+                        <button class="model-slot-btn" data-slot="custom_voice">Off <span class="slot-arrow">&#9662;</span></button>
+                        <div class="model-slot-dropdown hidden" data-slot="custom_voice">
+                            <div class="dropdown-option" data-size="off">Off</div>
+                            <div class="dropdown-option" data-size="0.6B">0.6B</div>
+                            <div class="dropdown-option" data-size="1.7B">1.7B</div>
+                        </div>
+                    </div>
                     <span id="backend-status" class="status-indicator"></span>
                 </div>
             </header>
@@ -124,6 +149,13 @@ Let's get started!"
                                 <input type="text" id="output-prefix" class="input" value="audio" placeholder="audio">
                             </div>
                             <button id="btn-generate" class="btn btn-primary btn-large">Generate Audio</button>
+                        </div>
+                        <div class="control-row instruction-row hidden" id="instruction-row">
+                            <div class="control-group" style="flex:1">
+                                <label>Voice Instruction <span class="label-hint">(Instruct model)</span></label>
+                                <input type="text" id="voice-instruction" class="input"
+                                       placeholder='e.g. "Speak slowly and warmly" or "Sound excited and energetic"'>
+                            </div>
                         </div>
                         <div id="generation-progress" class="progress-container hidden">
                             <div class="progress-bar">
@@ -239,27 +271,6 @@ Examples:
                 <div class="modal-footer">
                     <button class="btn btn-secondary modal-cancel">Cancel</button>
                     <button id="btn-create-clone" class="btn btn-primary">Clone Voice</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Models Modal -->
-        <div id="models-modal" class="modal hidden">
-            <div class="modal-overlay"></div>
-            <div class="modal-content modal-large">
-                <div class="modal-header">
-                    <h2>Model Manager</h2>
-                    <button class="modal-close">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <p class="modal-description">Download and manage Qwen3-TTS models. The 1.7B models offer better quality, while 0.6B models are faster and use less memory.</p>
-                    <div id="models-list" class="models-list">
-                        <!-- Model cards will be inserted here -->
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button id="btn-unload-models" class="btn btn-secondary">Unload All Models</button>
-                    <button class="btn btn-primary modal-cancel">Close</button>
                 </div>
             </div>
         </div>

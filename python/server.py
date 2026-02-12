@@ -83,12 +83,16 @@ class GenerateRequest(BaseModel):
     text: str
     language: str = "English"
     voice_id: Optional[str] = None
+    speaker: Optional[str] = None
+    instruction: Optional[str] = None
 
 
 class BatchGenerateRequest(BaseModel):
     texts: List[str]
     language: str = "English"
     voice_id: Optional[str] = None
+    speaker: Optional[str] = None
+    instruction: Optional[str] = None
     output_prefix: str = "audio"
 
 
@@ -146,7 +150,8 @@ async def list_models():
     return {
         "available": tts_service.get_available_models(),
         "downloaded": tts_service.get_downloaded_models(),
-        "loaded": tts_service.get_loaded_models()
+        "loaded": tts_service.get_loaded_models(),
+        "loaded_detail": tts_service.get_loaded_models_detail()
     }
 
 
@@ -211,6 +216,33 @@ async def unload_models():
 
     tts_service.unload_models()
     return {"status": "unloaded"}
+
+
+@app.post("/models/unload/{model_type}")
+async def unload_model(model_type: str):
+    """Unload a single model slot (base, voice_design, or custom_voice)."""
+    if not tts_service:
+        raise HTTPException(status_code=503, detail="Service not initialized")
+
+    valid_types = ["base", "voice_design", "custom_voice"]
+    if model_type not in valid_types:
+        raise HTTPException(status_code=400, detail=f"Invalid model type. Must be one of: {valid_types}")
+
+    try:
+        tts_service.unload_model(model_type)
+        return {"status": "unloaded", "model_type": model_type}
+    except Exception as e:
+        logger.error(f"Failed to unload model {model_type}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/models/speakers")
+async def get_speakers():
+    """Get list of predefined speakers from the custom voice model."""
+    if not tts_service:
+        raise HTTPException(status_code=503, detail="Service not initialized")
+
+    return {"speakers": tts_service.get_speakers()}
 
 
 # --- Voice Management Endpoints ---
@@ -336,12 +368,21 @@ async def generate_audio(request: GenerateRequest):
         raise HTTPException(status_code=503, detail="Service not initialized")
 
     try:
-        output_path = await asyncio.to_thread(
-            tts_service.generate,
-            request.text,
-            request.language,
-            request.voice_id
-        )
+        if request.speaker and tts_service.custom_voice_model is not None:
+            output_path = await asyncio.to_thread(
+                tts_service.generate_custom,
+                request.text,
+                request.speaker,
+                request.language,
+                request.instruction
+            )
+        else:
+            output_path = await asyncio.to_thread(
+                tts_service.generate,
+                request.text,
+                request.language,
+                request.voice_id
+            )
 
         return {
             "status": "generated",
@@ -360,13 +401,23 @@ async def batch_generate_audio(request: BatchGenerateRequest):
         raise HTTPException(status_code=503, detail="Service not initialized")
 
     try:
-        output_paths = await asyncio.to_thread(
-            tts_service.batch_generate,
-            request.texts,
-            request.language,
-            request.voice_id,
-            request.output_prefix
-        )
+        if request.speaker and tts_service.custom_voice_model is not None:
+            output_paths = await asyncio.to_thread(
+                tts_service.batch_generate_custom,
+                request.texts,
+                request.speaker,
+                request.language,
+                request.instruction,
+                request.output_prefix
+            )
+        else:
+            output_paths = await asyncio.to_thread(
+                tts_service.batch_generate,
+                request.texts,
+                request.language,
+                request.voice_id,
+                request.output_prefix
+            )
 
         return {
             "status": "generated",
