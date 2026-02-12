@@ -15,6 +15,7 @@ Desktop text-to-speech app using Qwen3-TTS for voice design, cloning, and genera
 - **Voice Design** - Create new voices from text descriptions (e.g. "deep male voice, British accent")
 - **Built-in Instruct Voices** - Predefined speakers with instruction control ("speak warmly", "sound excited")
 - **Batch Generation** - Generate multiple audio files from a script
+- **Tiny App** - Core app is only ~16MB thanks to [Electrobun](https://github.com/blackboardsh/electrobun)
 - **Auto-updating** - Built-in update mechanism for new releases
 
 ## Models
