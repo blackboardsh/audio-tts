@@ -19,6 +19,7 @@ export default {
             "python": "python",
         },
         mac: {
+            icons: "icon.iconset",
             bundleCEF: false,
             codesign: true,
             notarize: true,
