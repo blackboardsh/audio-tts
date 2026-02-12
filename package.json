@@ -1,27 +1,27 @@
 {
-  "name": "audio-tts",
-  "version": "0.1.4",
-  "description": "Desktop TTS app using Qwen3-TTS for voice design and cloning",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/blackboardsh/audio-tts.git"
-  },
-  "scripts": {
-    "dev": "electrobun dev",
-    "build": "electrobun build",
-    "build:canary": "electrobun build --env=canary",
-    "build:stable": "electrobun build --env=stable",
-    "start": "bun run build && bun run dev",
-    "push:canary": "npm version prerelease --preid=canary && git push origin main --tags",
-    "push:patch": "npm version prepatch --preid=canary && git push origin main --tags",
-    "push:minor": "npm version preminor --preid=canary && git push origin main --tags",
-    "push:major": "npm version premajor --preid=canary && git push origin main --tags",
-    "push:stable": "npm version patch && git push origin main --tags"
-  },
-  "dependencies": {
-    "electrobun": "1.2.3-beta.0"
-  },
-  "devDependencies": {
-    "@types/bun": "latest"
-  }
+	"name": "audio-tts",
+	"version": "0.1.4",
+	"description": "Desktop TTS app using Qwen3-TTS for voice design and cloning",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/blackboardsh/audio-tts.git"
+	},
+	"scripts": {
+		"dev": "electrobun dev",
+		"build": "electrobun build",
+		"build:canary": "electrobun build --env=canary",
+		"build:stable": "electrobun build --env=stable",
+		"start": "bun run build && bun run dev",
+		"push:canary": "npm version prerelease --preid=canary && git push origin main --tags",
+		"push:patch": "npm version prepatch --preid=canary && git push origin main --tags",
+		"push:minor": "npm version preminor --preid=canary && git push origin main --tags",
+		"push:major": "npm version premajor --preid=canary && git push origin main --tags",
+		"push:stable": "npm version patch && git push origin main --tags"
+	},
+	"dependencies": {
+		"electrobun": "1.12.3"
+	},
+	"devDependencies": {
+		"@types/bun": "latest"
+	}
 }
