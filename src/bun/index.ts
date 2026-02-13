@@ -360,11 +360,34 @@ async function startBackend(): Promise<boolean> {
 		return false;
 	}
 
+	// Get certifi cert path from the venv for SSL support
+	// (standalone Python from uv may not find system certs)
+	let sslCertFile = "";
+	try {
+		const certResult = Bun.spawnSync([
+			pythonPath,
+			"-c",
+			"import certifi; print(certifi.where())",
+		]);
+		sslCertFile = certResult.stdout.toString().trim();
+		if (sslCertFile) {
+			console.log("SSL cert file:", sslCertFile);
+		}
+	} catch {
+		console.warn("Could not get certifi cert path");
+	}
+
 	const env: Record<string, string> = {
 		...(process.env as any),
 		PORT: String(BACKEND_PORT),
 		PYTORCH_ENABLE_MPS_FALLBACK: "1",
 		PYTHONUNBUFFERED: "1",
+		...(sslCertFile
+			? {
+					SSL_CERT_FILE: sslCertFile,
+					REQUESTS_CA_BUNDLE: sslCertFile,
+				}
+			: {}),
 	};
 
 	backendProcess = spawn([pythonPath, serverPath], {

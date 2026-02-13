@@ -311,6 +311,16 @@ class TTSService:
                 from huggingface_hub import snapshot_download, HfApi, hf_hub_download
                 import os
 
+                # Ensure SSL certificates are available (standalone Python installs
+                # from uv may not find system certs)
+                try:
+                    import certifi
+                    os.environ.setdefault("SSL_CERT_FILE", certifi.where())
+                    os.environ.setdefault("REQUESTS_CA_BUNDLE", certifi.where())
+                    logger.info(f"SSL certs: {certifi.where()}")
+                except ImportError:
+                    logger.warning("certifi not installed, using system SSL certs")
+
                 logger.info(f"Starting download for {model_id}")
 
                 # Get repo info to count files and sizes
@@ -326,26 +336,39 @@ class TTSService:
                     task.total_files = 0
                     task.total_bytes = 0
 
-                # Custom progress callback
-                downloaded_files = [0]
-                downloaded_bytes = [0]
+                # Custom tqdm class to track per-file download progress
+                from tqdm.auto import tqdm as base_tqdm
 
-                def progress_callback(progress_info):
-                    """Called for each file downloaded"""
-                    if hasattr(progress_info, 'filename'):
-                        task.current_file = progress_info.filename
-                    downloaded_files[0] += 1
-                    task.files_completed = downloaded_files[0]
-                    if task.total_files > 0:
-                        task.progress = (downloaded_files[0] / task.total_files) * 100
-                    logger.info(f"Downloaded {downloaded_files[0]}/{task.total_files}: {task.current_file}")
+                class DownloadProgressTqdm(base_tqdm):
+                    def __init__(self, *args, **kwargs):
+                        super().__init__(*args, **kwargs)
+                        # Each tqdm instance tracks one file download
+                        desc = kwargs.get('desc', '') or (args[0] if args and isinstance(args[0], str) else '')
+                        if hasattr(self, 'desc') and self.desc:
+                            task.current_file = self.desc
+                            logger.info(f"Downloading: {self.desc}")
+
+                    def update(self, n=1):
+                        result = super().update(n)
+                        # Update byte-level progress
+                        if self.total and self.total > 0:
+                            task.downloaded_bytes += n
+                        return result
+
+                    def close(self):
+                        super().close()
+                        # When a file finishes, increment file count
+                        if self.total and self.n >= self.total:
+                            task.files_completed += 1
+                            if task.total_files > 0:
+                                task.progress = (task.files_completed / task.total_files) * 100
+                            logger.info(f"Completed file {task.files_completed}/{task.total_files}: {self.desc}")
 
                 # Download using snapshot_download which downloads ALL files
-                # Don't use local_dir - use the default cache system
                 local_path = snapshot_download(
                     repo_id=model_id,
                     cache_dir=str(self.models_dir),
-                    # resume_download=True,  # Resume if interrupted
+                    tqdm_class=DownloadProgressTqdm,
                 )
 
                 logger.info(f"Download completed to: {local_path}")
