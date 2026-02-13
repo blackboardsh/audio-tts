@@ -69,6 +69,10 @@ type AppRPCSchema = {
         params: {};
         response: { appData: string; models: string; voices: string; output: string };
       };
+      openFolder: {
+        params: { path: string };
+        response: void;
+      };
       backendRequest: {
         params: { method: string; path: string; body?: any };
         response: { status: number; data: any };
@@ -210,13 +214,14 @@ interface SlotState {
   targetSize: string;    // what we're trying to reach, or "off"
   status: SlotStatus;
   statusText: string;
+  errorMessage: string;  // full error message for tooltip
   downloadTaskId: string | null;
 }
 
 const modelSlots: Record<string, SlotState> = {
-  base: { currentSize: "off", targetSize: "off", status: "off", statusText: "", downloadTaskId: null },
-  voice_design: { currentSize: "off", targetSize: "off", status: "off", statusText: "", downloadTaskId: null },
-  custom_voice: { currentSize: "off", targetSize: "off", status: "off", statusText: "", downloadTaskId: null },
+  base: { currentSize: "off", targetSize: "off", status: "off", statusText: "", errorMessage: "", downloadTaskId: null },
+  voice_design: { currentSize: "off", targetSize: "off", status: "off", statusText: "", errorMessage: "", downloadTaskId: null },
+  custom_voice: { currentSize: "off", targetSize: "off", status: "off", statusText: "", errorMessage: "", downloadTaskId: null },
 };
 
 let downloadedModelIds: Set<string> = new Set();
@@ -791,6 +796,13 @@ function updateSlotUI(slotType: string) {
       break;
   }
 
+  // Show error message as tooltip when in error state
+  if (slot.status === "error" && slot.errorMessage) {
+    btn.title = slot.errorMessage;
+  } else {
+    btn.title = "";
+  }
+
   btn.innerHTML = `${spinnerHtml}${escapeHtml(label)} <span class="slot-arrow">&#9662;</span>`;
 
   updateDropdownOptions(slotType);
@@ -810,7 +822,7 @@ function updateDropdownOptions(slotType: string) {
     if (oldHint) oldHint.remove();
 
     if (size === "off") {
-      if (slot.status === "off") opt.classList.add("active");
+      if (slot.status === "off" || slot.status === "error") opt.classList.add("active");
     } else {
       // Check if active
       if (slot.status === "loaded" && slot.currentSize === size) {
@@ -826,6 +838,7 @@ function updateDropdownOptions(slotType: string) {
       }
     }
   });
+
 }
 
 function toggleDropdown(slotType: string) {
@@ -855,6 +868,9 @@ async function onSlotSelectionChange(slotType: string, newSize: string) {
   // If busy, ignore
   if (slot.status === "downloading" || slot.status === "loading") return;
 
+  // Clear previous error
+  slot.errorMessage = "";
+
   if (newSize === "off") {
     // Unload
     slot.targetSize = "off";
@@ -883,6 +899,7 @@ async function onSlotSelectionChange(slotType: string, newSize: string) {
       console.error(`Failed to unload ${slotType}:`, e);
       slot.status = "error";
       slot.statusText = "Unload failed";
+      slot.errorMessage = (e as any).message || String(e);
     }
     updateSlotUI(slotType);
     return;
@@ -945,6 +962,7 @@ async function downloadAndLoadSlot(slotType: string, size: string, modelId: stri
     console.error(`Failed to download/load ${slotType} ${size}:`, e);
     slot.status = "error";
     slot.statusText = "Failed";
+    slot.errorMessage = e.message || String(e);
     slot.downloadTaskId = null;
     updateSlotUI(slotType);
   }
@@ -1000,6 +1018,7 @@ async function loadSlot(slotType: string, size: string) {
     console.error(`Failed to load ${slotType} ${size}:`, e);
     slot.status = "error";
     slot.statusText = e.name === "AbortError" ? "Timeout" : "Load failed";
+    slot.errorMessage = e.message || String(e);
     updateSlotUI(slotType);
   }
 }
@@ -1311,10 +1330,18 @@ async function clearAllOutputFiles() {
 async function openOutputFolder() {
   try {
     const paths = await getPaths();
-    console.log("Output folder:", paths.output);
-    alert(`Output folder: ${paths.output}`);
+    await rpc.request.openFolder({ path: paths.output });
   } catch (e) {
-    console.error("Failed to get paths:", e);
+    console.error("Failed to open output folder:", e);
+  }
+}
+
+async function openModelsFolder() {
+  try {
+    const paths = await getPaths();
+    await rpc.request.openFolder({ path: paths.models });
+  } catch (e) {
+    console.error("Failed to open models folder:", e);
   }
 }
 
@@ -1514,6 +1541,7 @@ function setupEventListeners() {
   $("#btn-generate")?.addEventListener("click", generateAudio);
 
   $("#btn-open-output")?.addEventListener("click", openOutputFolder);
+  $("#btn-open-models")?.addEventListener("click", openModelsFolder);
   $("#btn-clear-output")?.addEventListener("click", clearAllOutputFiles);
 
   // Update button

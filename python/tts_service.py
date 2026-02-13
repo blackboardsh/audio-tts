@@ -260,6 +260,29 @@ class TTSService:
 
         return False
 
+    def delete_model(self, model_id: str) -> bool:
+        """Delete a downloaded model from disk."""
+        import shutil
+        deleted = False
+
+        # Check local simple folder format
+        model_name = model_id.split("/")[-1]
+        model_path = self.models_dir / model_name
+        if model_path.exists():
+            shutil.rmtree(model_path)
+            logger.info(f"Deleted model folder: {model_path}")
+            deleted = True
+
+        # Check HuggingFace cache format
+        hf_cache_name = f"models--{model_id.replace('/', '--')}"
+        hf_cache_path = self.models_dir / hf_cache_name
+        if hf_cache_path.exists():
+            shutil.rmtree(hf_cache_path)
+            logger.info(f"Deleted HF cache folder: {hf_cache_path}")
+            deleted = True
+
+        return deleted
+
     def _is_model_loaded(self, model_type: str) -> bool:
         """Check if a model type is loaded."""
         if model_type == "base":

@@ -236,6 +236,24 @@ async def unload_model(model_type: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.delete("/models/{model_id:path}")
+async def delete_model(model_id: str):
+    """Delete a downloaded model from disk."""
+    if not tts_service:
+        raise HTTPException(status_code=503, detail="Service not initialized")
+
+    try:
+        deleted = tts_service.delete_model(model_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Model not found on disk")
+        return {"status": "deleted", "model_id": model_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete model {model_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/models/speakers")
 async def get_speakers():
     """Get list of predefined speakers from the custom voice model."""

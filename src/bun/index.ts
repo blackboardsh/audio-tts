@@ -490,6 +490,10 @@ type AppRPCSchema = {
 					output: string;
 				};
 			};
+			openFolder: {
+				params: { path: string };
+				response: void;
+			};
 			backendRequest: {
 				params: { method: string; path: string; body?: any };
 				response: { status: number; data: any };
@@ -541,6 +545,10 @@ const rpc = BrowserView.defineRPC<AppRPCSchema>({
 					voices: VOICES_DIR,
 					output: OUTPUT_DIR,
 				};
+			},
+
+			openFolder: async ({ path }) => {
+				spawn(["open", path]);
 			},
 
 			backendRequest: async ({ method, path, body }) => {

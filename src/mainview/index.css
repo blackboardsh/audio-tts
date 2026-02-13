@@ -823,6 +823,7 @@ body {
     margin-left: 8px;
 }
 
+
 @keyframes spin {
     to {
         transform: rotate(360deg);
