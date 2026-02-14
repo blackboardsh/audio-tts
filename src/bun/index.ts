@@ -35,7 +35,8 @@ const PYTHON_DIR = join(APP_DATA_DIR, "python");
 const MODELS_DIR = join(APP_DATA_DIR, "models");
 const VOICES_DIR = join(APP_DATA_DIR, "voices");
 const OUTPUT_DIR = join(APP_DATA_DIR, "output");
-const BACKEND_PORT = 8765;
+const BACKEND_PORT_START = 8765;
+let BACKEND_PORT = BACKEND_PORT_START;
 
 // Ensure directories exist
 [APP_DATA_DIR, PYTHON_DIR, MODELS_DIR, VOICES_DIR, OUTPUT_DIR].forEach(
@@ -342,6 +343,27 @@ async function installPythonDependencies(): Promise<boolean> {
 	return true;
 }
 
+async function findFreePort(startPort: number): Promise<number> {
+	for (let port = startPort; port < startPort + 100; port++) {
+		try {
+			const server = Bun.listen({
+				hostname: "127.0.0.1",
+				port,
+				socket: {
+					data() {},
+				},
+			});
+			server.stop();
+			return port;
+		} catch {
+			// Port in use, try next
+		}
+	}
+	throw new Error(
+		`No free port found in range ${startPort}-${startPort + 99}`,
+	);
+}
+
 async function startBackend(): Promise<boolean> {
 	console.log("Starting Python backend...");
 
@@ -375,6 +397,15 @@ async function startBackend(): Promise<boolean> {
 		}
 	} catch {
 		console.warn("Could not get certifi cert path");
+	}
+
+	// Find a free port before starting
+	try {
+		BACKEND_PORT = await findFreePort(BACKEND_PORT_START);
+		console.log(`Using port ${BACKEND_PORT}`);
+	} catch (e) {
+		console.error("Could not find a free port:", e);
+		return false;
 	}
 
 	const env: Record<string, string> = {
