@@ -126,6 +126,15 @@ class TTSService:
         os.environ["HUGGINGFACE_HUB_CACHE"] = str(models_dir)
         os.environ["HF_HUB_CACHE"] = str(models_dir)
 
+        # Ensure SSL certificates are available (standalone Python from uv
+        # may not find system certs)
+        try:
+            import certifi
+            os.environ.setdefault("SSL_CERT_FILE", certifi.where())
+            os.environ.setdefault("REQUESTS_CA_BUNDLE", certifi.where())
+        except ImportError:
+            pass
+
         # Loaded models
         self.base_model = None
         self.voice_design_model = None
@@ -311,16 +320,6 @@ class TTSService:
                 from huggingface_hub import snapshot_download, HfApi, hf_hub_download
                 import os
 
-                # Ensure SSL certificates are available (standalone Python installs
-                # from uv may not find system certs)
-                try:
-                    import certifi
-                    os.environ.setdefault("SSL_CERT_FILE", certifi.where())
-                    os.environ.setdefault("REQUESTS_CA_BUNDLE", certifi.where())
-                    logger.info(f"SSL certs: {certifi.where()}")
-                except ImportError:
-                    logger.warning("certifi not installed, using system SSL certs")
-
                 logger.info(f"Starting download for {model_id}")
 
                 # Get repo info to count files and sizes
@@ -383,6 +382,17 @@ class TTSService:
                     logger.info(f"Found {len(model_files)} model weight files")
                 else:
                     logger.warning(f"No model weight files found in {local_path}")
+
+                # Also download the tokenizer if not already present
+                tokenizer_id = AVAILABLE_MODELS["tokenizer"]["id"]
+                if not self._is_model_downloaded(tokenizer_id):
+                    logger.info(f"Also downloading tokenizer: {tokenizer_id}")
+                    task.current_file = "tokenizer"
+                    snapshot_download(
+                        repo_id=tokenizer_id,
+                        cache_dir=str(self.models_dir),
+                    )
+                    logger.info("Tokenizer downloaded successfully")
 
                 task.status = "completed"
                 task.progress = 100.0
