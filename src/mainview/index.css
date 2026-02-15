@@ -9,9 +9,9 @@
     --text-secondary: #a0a0a0;
     --text-muted: #666666;
 
-    --accent-primary: #ff1493;
-    --accent-primary-hover: #e0107e;
-    --accent-secondary: #ff69b4;
+    --accent-primary: #00bfff;
+    --accent-primary-hover: #009ad6;
+    --accent-secondary: #69d4ff;
     --accent-success: #22c55e;
     --accent-warning: #f59e0b;
     --accent-danger: #ef4444;
@@ -703,7 +703,7 @@ body {
 
 .file-upload:hover {
     border-color: var(--accent-primary);
-    background: rgba(255, 20, 147, 0.05);
+    background: rgba(0, 191, 255, 0.05);
 }
 
 .file-upload-icon {
