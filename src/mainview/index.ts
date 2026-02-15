@@ -92,6 +92,7 @@ type AppRPCSchema = {
     requests: {};
     messages: {
       updateStatus: UpdateInfo;
+      backendLog: { stream: "stdout" | "stderr"; text: string };
     };
   }>;
 };
@@ -105,12 +106,58 @@ const rpc = Electroview.defineRPC<AppRPCSchema>({
       updateStatus: (info: UpdateInfo) => {
         updateUpdateUI(info);
       },
+      backendLog: (msg: { stream: "stdout" | "stderr"; text: string }) => {
+        appendLogMessage(msg.stream, msg.text);
+      },
     },
   },
 });
 
 // Initialize Electroview
 const electroview = new Electroview({ rpc });
+
+// ========== Log Panel ==========
+
+let logVisible = false;
+const MAX_LOG_LINES = 300;
+
+function appendLogMessage(stream: "stdout" | "stderr", text: string) {
+  const logContent = document.getElementById("log-content");
+  if (!logContent) return;
+
+  const lines = text.split("\n");
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const el = document.createElement("div");
+    el.className = `log-line ${stream === "stderr" ? "log-stderr" : "log-stdout"}`;
+    el.textContent = line;
+    logContent.appendChild(el);
+  }
+
+  while (logContent.childElementCount > MAX_LOG_LINES) {
+    logContent.removeChild(logContent.firstChild!);
+  }
+
+  if (logVisible) {
+    logContent.scrollTop = logContent.scrollHeight;
+  }
+}
+
+function toggleLogPanel() {
+  const panel = document.getElementById("log-panel")!;
+  const btn = document.getElementById("btn-toggle-log")!;
+  logVisible = !logVisible;
+
+  if (logVisible) {
+    panel.classList.remove("hidden");
+    btn.classList.add("active");
+    const logContent = document.getElementById("log-content")!;
+    logContent.scrollTop = logContent.scrollHeight;
+  } else {
+    panel.classList.add("hidden");
+    btn.classList.remove("active");
+  }
+}
 
 // ========== RPC Helpers ==========
 
@@ -1543,6 +1590,7 @@ function setupEventListeners() {
   $("#btn-open-output")?.addEventListener("click", openOutputFolder);
   $("#btn-open-models")?.addEventListener("click", openModelsFolder);
   $("#btn-clear-output")?.addEventListener("click", clearAllOutputFiles);
+  $("#btn-toggle-log")?.addEventListener("click", toggleLogPanel);
 
   // Update button
   $("#btn-apply-update")?.addEventListener("click", applyUpdate);

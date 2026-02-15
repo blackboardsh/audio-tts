@@ -428,13 +428,18 @@ async function startBackend(): Promise<boolean> {
 		stderr: "pipe",
 	});
 
-	// Log backend output
+	// Log backend output and forward to UI
 	(async () => {
 		const reader = backendProcess?.stdout.getReader();
 		while (true) {
 			const { done, value } = await reader.read();
 			if (done) break;
-			console.log("[Backend]", new TextDecoder().decode(value));
+			const text = new TextDecoder().decode(value);
+			console.log("[Backend]", text);
+			mainWindowRef?.webview.rpc?.send.backendLog({
+				stream: "stdout",
+				text,
+			});
 		}
 	})();
 
@@ -443,7 +448,12 @@ async function startBackend(): Promise<boolean> {
 		while (true) {
 			const { done, value } = await reader.read();
 			if (done) break;
-			console.error("[Backend Error]", new TextDecoder().decode(value));
+			const text = new TextDecoder().decode(value);
+			console.error("[Backend Error]", text);
+			mainWindowRef?.webview.rpc?.send.backendLog({
+				stream: "stderr",
+				text,
+			});
 		}
 	})();
 
@@ -567,6 +577,7 @@ type AppRPCSchema = {
 		requests: {};
 		messages: {
 			updateStatus: UpdateInfo;
+			backendLog: { stream: "stdout" | "stderr"; text: string };
 		};
 	}>;
 };
