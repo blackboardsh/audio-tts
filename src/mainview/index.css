@@ -296,25 +296,25 @@ body {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    padding: 24px;
-    gap: 24px;
+    padding: 16px;
+    gap: 16px;
 }
 
 .panel-section {
     background: var(--bg-secondary);
     border-radius: var(--border-radius-lg);
-    padding: 20px;
+    padding: 16px;
 }
 
 .section-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
 }
 
 .section-header h2 {
-    font-size: 1rem;
+    font-size: 0.875rem;
     font-weight: 600;
 }
 
@@ -365,17 +365,17 @@ body {
 .control-row {
     display: flex;
     align-items: flex-end;
-    gap: 16px;
+    gap: 12px;
 }
 
 .control-group {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
 }
 
 .control-group label {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     font-weight: 500;
     color: var(--text-secondary);
 }
@@ -395,10 +395,8 @@ body {
     cursor: not-allowed;
 }
 
-/* ========== Advanced Settings ========== */
-.advanced-settings {
-    margin-top: 12px;
-    gap: 24px;
+.controls-main-row {
+    align-items: flex-end;
 }
 
 .slider-group {
@@ -459,7 +457,10 @@ body {
 .btn-generate {
     position: relative;
     overflow: hidden;
-    min-width: 180px;
+    min-width: 120px;
+    padding: 4px 14px;
+    font-size: 0.8rem;
+    flex-shrink: 0;
 }
 
 .btn-generate-fill {
@@ -626,11 +627,6 @@ body {
     font-size: 0.75rem;
 }
 
-.btn-large {
-    padding: 12px 24px;
-    font-size: 1rem;
-}
-
 .btn-icon {
     padding: 6px;
     width: 28px;
@@ -641,10 +637,10 @@ body {
 .input, .select, .textarea {
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
+    border-radius: 6px;
     color: var(--text-primary);
-    padding: 10px 14px;
-    font-size: 0.9rem;
+    padding: 6px 10px;
+    font-size: 0.8rem;
     transition: var(--transition);
 }
 
@@ -654,13 +650,27 @@ body {
 }
 
 .select {
-    min-width: 150px;
+    min-width: 120px;
+    cursor: pointer;
+}
+
+.select:hover {
+    background: var(--bg-hover);
+    border-color: var(--text-muted);
 }
 
 .textarea {
     min-height: 100px;
     resize: vertical;
     font-family: inherit;
+    padding: 10px 14px;
+    font-size: 0.875rem;
+}
+
+/* Inputs inside modals get slightly more room */
+.modal .input, .modal .select {
+    padding: 8px 12px;
+    font-size: 0.875rem;
 }
 
 .form-group {
@@ -807,6 +817,71 @@ body {
     gap: 12px;
     padding: 16px 24px;
     border-top: 1px solid var(--border-color);
+}
+
+/* ========== Custom Dropdowns (shared) ========== */
+.custom-dropdown {
+    position: relative;
+    display: inline-flex;
+}
+
+.custom-dropdown-btn {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-weight: 500;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: var(--transition);
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.custom-dropdown-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--text-muted);
+}
+
+.custom-dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    min-width: 100%;
+    max-height: 280px;
+    overflow-y: auto;
+    z-index: 100;
+    box-shadow: var(--shadow-lg);
+}
+
+#voice-dropdown {
+    min-width: 260px;
+}
+
+#voice-dropdown .custom-dropdown-btn {
+    width: 100%;
+    justify-content: space-between;
+}
+
+#voice-dropdown .custom-dropdown-menu {
+    width: 100%;
+}
+
+.custom-dropdown-menu .dropdown-group-label {
+    padding: 6px 14px 2px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    cursor: default;
 }
 
 /* ========== Model Slot Dropdowns ========== */

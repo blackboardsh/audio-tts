@@ -105,29 +105,32 @@
                         <div class="section-header">
                             <h2>Script</h2>
                             <div class="section-actions">
-                                <select id="language-select" class="select">
-                                    <option value="English">English</option>
-                                    <option value="Chinese">Chinese</option>
-                                    <option value="Japanese">Japanese</option>
-                                    <option value="Korean">Korean</option>
-                                    <option value="German">German</option>
-                                    <option value="French">French</option>
-                                    <option value="Spanish">Spanish</option>
-                                    <option value="Portuguese">Portuguese</option>
-                                    <option value="Russian">Russian</option>
-                                    <option value="Italian">Italian</option>
-                                </select>
+                                <div class="custom-dropdown" id="language-dropdown">
+                                    <button class="custom-dropdown-btn" type="button">English <span class="slot-arrow">&#9662;</span></button>
+                                    <div class="custom-dropdown-menu hidden">
+                                        <div class="dropdown-option active" data-value="English">English</div>
+                                        <div class="dropdown-option" data-value="Chinese">Chinese</div>
+                                        <div class="dropdown-option" data-value="Japanese">Japanese</div>
+                                        <div class="dropdown-option" data-value="Korean">Korean</div>
+                                        <div class="dropdown-option" data-value="German">German</div>
+                                        <div class="dropdown-option" data-value="French">French</div>
+                                        <div class="dropdown-option" data-value="Spanish">Spanish</div>
+                                        <div class="dropdown-option" data-value="Portuguese">Portuguese</div>
+                                        <div class="dropdown-option" data-value="Russian">Russian</div>
+                                        <div class="dropdown-option" data-value="Italian">Italian</div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         <textarea
                             id="script-editor"
                             class="script-editor"
-                            placeholder="Enter your script here. Each line or sentence will be generated as a separate audio clip.
+                            placeholder="Enter your script here. Each line will be generated as a separate audio clip.
 
 Example:
-Welcome to our product demo.
-Today we'll show you three amazing features.
-Let's get started!"
+This app was built with Electrobun and it's only 16 megabytes.
+App updates are as small as 4 kilobytes.
+Build your own apps with npx electrobun init."
                         ></textarea>
                         <div class="editor-footer">
                             <span id="line-count">0 lines</span>
@@ -139,30 +142,15 @@ Let's get started!"
 
                     <!-- Generation Controls -->
                     <div class="panel-section generation-controls">
-                        <div class="control-row">
+                        <div class="control-row controls-main-row">
                             <div class="control-group">
-                                <label>Voice</label>
-                                <select id="voice-select" class="select">
-                                    <option value="">Default Voice</option>
-                                </select>
+                                <div class="custom-dropdown" id="voice-dropdown">
+                                    <button class="custom-dropdown-btn" type="button">Default Voice <span class="slot-arrow">&#9662;</span></button>
+                                    <div class="custom-dropdown-menu hidden">
+                                        <div class="dropdown-option active" data-value="">Default Voice</div>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="control-group">
-                                <label>Output Prefix</label>
-                                <input type="text" id="output-prefix" class="input" value="audio" placeholder="audio">
-                            </div>
-                            <button id="btn-generate" class="btn btn-primary btn-large btn-generate">
-                                <span class="btn-generate-fill"></span>
-                                <span class="btn-generate-label">Generate Audio</span>
-                            </button>
-                        </div>
-                        <div class="control-row instruction-row hidden" id="instruction-row">
-                            <div class="control-group" style="flex:1">
-                                <label>Voice Instruction <span class="label-hint">(Instruct model)</span></label>
-                                <input type="text" id="voice-instruction" class="input"
-                                       placeholder='e.g. "Speak slowly and warmly" or "Sound excited and energetic"'>
-                            </div>
-                        </div>
-                        <div class="control-row advanced-settings">
                             <div class="control-group slider-group">
                                 <label>Temperature <span class="slider-value" id="val-temperature">0.7</span></label>
                                 <input type="range" id="slider-temperature" min="0.1" max="1.5" step="0.05" value="0.7" class="range-slider">
@@ -172,8 +160,19 @@ Let's get started!"
                                 <input type="range" id="slider-top-p" min="0.1" max="1.0" step="0.05" value="0.9" class="range-slider">
                             </div>
                             <div class="control-group slider-group">
-                                <label>Repetition Penalty <span class="slider-value" id="val-repetition-penalty">1.1</span></label>
+                                <label>Rep. Penalty <span class="slider-value" id="val-repetition-penalty">1.1</span></label>
                                 <input type="range" id="slider-repetition-penalty" min="1.0" max="1.5" step="0.05" value="1.1" class="range-slider">
+                            </div>
+                            <button id="btn-generate" class="btn btn-primary btn-generate">
+                                <span class="btn-generate-fill"></span>
+                                <span class="btn-generate-label">Generate</span>
+                            </button>
+                        </div>
+                        <div class="control-row instruction-row hidden" id="instruction-row">
+                            <div class="control-group" style="flex:1">
+                                <label>Voice Instruction <span class="label-hint">(Instruct model)</span></label>
+                                <input type="text" id="voice-instruction" class="input"
+                                       placeholder='e.g. "Speak slowly and warmly" or "Sound excited and energetic"'>
                             </div>
                         </div>
                     </div>

@@ -244,6 +244,79 @@ function setStepState(
   }
 }
 
+// ========== Custom Dropdown ==========
+
+/** Tracks the current value for each custom dropdown by id. */
+const dropdownValues: Record<string, string> = {
+  "language-dropdown": "English",
+  "voice-dropdown": "",
+};
+
+function getDropdownValue(id: string): string {
+  return dropdownValues[id] ?? "";
+}
+
+function setDropdownValue(id: string, value: string, label?: string) {
+  dropdownValues[id] = value;
+  const container = $(`#${id}`)!;
+  const btn = container.querySelector(".custom-dropdown-btn") as HTMLElement;
+  const menu = container.querySelector(".custom-dropdown-menu")!;
+
+  // Update button label
+  if (label) {
+    btn.innerHTML = `${escapeHtml(label)} <span class="slot-arrow">&#9662;</span>`;
+  }
+
+  // Update active state
+  menu.querySelectorAll(".dropdown-option").forEach((opt) => {
+    opt.classList.toggle("active", (opt as HTMLElement).getAttribute("data-value") === value);
+  });
+}
+
+function setupCustomDropdown(id: string, onChange?: (value: string) => void) {
+  const container = $(`#${id}`)!;
+  const btn = container.querySelector(".custom-dropdown-btn") as HTMLElement;
+  const menu = container.querySelector(".custom-dropdown-menu") as HTMLElement;
+
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    // Close all other dropdown menus first
+    document.querySelectorAll(".custom-dropdown-menu, .model-slot-dropdown").forEach((d) => {
+      if (d !== menu) d.classList.add("hidden");
+    });
+    menu.classList.toggle("hidden");
+  });
+
+  menu.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const opt = (e.target as HTMLElement).closest(".dropdown-option") as HTMLElement | null;
+    if (!opt) return;
+    const value = opt.getAttribute("data-value") ?? "";
+    const label = opt.textContent?.trim() ?? "";
+    setDropdownValue(id, value, label);
+    menu.classList.add("hidden");
+    onChange?.(value);
+  });
+}
+
+function rebuildDropdownMenu(id: string, items: Array<{ value: string; label: string; group?: string }>) {
+  const container = $(`#${id}`)!;
+  const menu = container.querySelector(".custom-dropdown-menu")!;
+  const currentValue = getDropdownValue(id);
+
+  let html = "";
+  let lastGroup: string | undefined;
+  for (const item of items) {
+    if (item.group && item.group !== lastGroup) {
+      html += `<div class="dropdown-group-label">${escapeHtml(item.group)}</div>`;
+      lastGroup = item.group;
+    }
+    const active = item.value === currentValue ? " active" : "";
+    html += `<div class="dropdown-option${active}" data-value="${escapeHtml(item.value)}">${escapeHtml(item.label)}</div>`;
+  }
+  menu.innerHTML = html;
+}
+
 // ========== State ==========
 
 let voices: Voice[] = [];
@@ -423,41 +496,37 @@ function updateVoiceList() {
 }
 
 function updateVoiceSelect() {
-  const select = $("#voice-select") as HTMLSelectElement;
-  const currentValue = select.value;
-  select.innerHTML = '<option value="">Default Voice</option>';
+  const items: Array<{ value: string; label: string; group?: string }> = [
+    { value: "", label: "Default Voice" },
+  ];
 
-  // Add built-in speakers from Instruct model
   if (builtInSpeakers.length > 0) {
-    const group = document.createElement("optgroup");
-    group.label = "Built-in Speakers (Instruct)";
-    builtInSpeakers.forEach((speaker) => {
-      const option = document.createElement("option");
-      option.value = `speaker:${speaker}`;
-      option.textContent = speaker;
-      group.appendChild(option);
-    });
-    select.appendChild(group);
+    for (const speaker of builtInSpeakers) {
+      items.push({ value: `speaker:${speaker}`, label: speaker, group: "Built-in Speakers" });
+    }
   }
 
-  // Add cloned/designed voices
   if (voices.length > 0) {
-    const group = document.createElement("optgroup");
-    group.label = "My Voices";
-    voices.forEach((voice) => {
-      const option = document.createElement("option");
-      option.value = voice.id;
-      option.textContent = voice.name;
-      group.appendChild(option);
-    });
-    select.appendChild(group);
+    for (const voice of voices) {
+      items.push({ value: voice.id, label: voice.name, group: "My Voices" });
+    }
   }
 
-  // Restore selection
+  rebuildDropdownMenu("voice-dropdown", items);
+
+  // Restore selection label
+  const currentValue = getDropdownValue("voice-dropdown");
   if (selectedVoiceId) {
-    select.value = selectedVoiceId;
+    const voice = voices.find((v) => v.id === selectedVoiceId);
+    setDropdownValue("voice-dropdown", selectedVoiceId, voice?.name ?? selectedVoiceId);
   } else if (currentValue) {
-    select.value = currentValue;
+    // Keep current selection if still valid
+    const match = items.find((i) => i.value === currentValue);
+    if (match) {
+      setDropdownValue("voice-dropdown", currentValue, match.label);
+    } else {
+      setDropdownValue("voice-dropdown", "", "Default Voice");
+    }
   }
 
   updateInstructionRow();
@@ -474,10 +543,9 @@ async function fetchSpeakers() {
 }
 
 function updateInstructionRow() {
-  const select = $("#voice-select") as HTMLSelectElement;
   const row = $("#instruction-row")!;
   const input = $("#voice-instruction") as HTMLInputElement;
-  const selectedValue = select.value;
+  const selectedValue = getDropdownValue("voice-dropdown");
 
   const isBuiltInSpeaker = selectedValue.startsWith("speaker:");
   const customVoiceSlot = modelSlots["custom_voice"];
@@ -503,8 +571,10 @@ function selectVoice(voiceId: string | null) {
   selectedVoiceId = voiceId;
   updateVoiceList();
 
-  const select = $("#voice-select") as HTMLSelectElement;
-  select.value = voiceId || "";
+  const label = voiceId
+    ? (voices.find((v) => v.id === voiceId)?.name ?? voiceId)
+    : "Default Voice";
+  setDropdownValue("voice-dropdown", voiceId || "", label);
   updateInstructionRow();
 }
 
@@ -900,7 +970,7 @@ function toggleDropdown(slotType: string) {
 
   const isOpen = !dropdown.classList.contains("hidden");
   // Close all dropdowns first
-  document.querySelectorAll(".model-slot-dropdown").forEach((d) => d.classList.add("hidden"));
+  document.querySelectorAll(".model-slot-dropdown, .custom-dropdown-menu").forEach((d) => d.classList.add("hidden"));
 
   if (!isOpen) {
     updateDropdownOptions(slotType);
@@ -942,9 +1012,8 @@ async function onSlotSelectionChange(slotType: string, newSize: string) {
       if (slotType === "custom_voice") {
         builtInSpeakers = [];
         // Reset voice select if a built-in speaker was selected
-        const voiceSelect = $("#voice-select") as HTMLSelectElement;
-        if (voiceSelect.value.startsWith("speaker:")) {
-          voiceSelect.value = "";
+        if (getDropdownValue("voice-dropdown").startsWith("speaker:")) {
+          setDropdownValue("voice-dropdown", "", "Default Voice");
         }
         updateVoiceSelect();
       }
@@ -1182,9 +1251,9 @@ function setupDropdowns() {
     });
   });
 
-  // Click outside closes dropdowns
+  // Click outside closes all dropdowns
   document.addEventListener("click", () => {
-    document.querySelectorAll(".model-slot-dropdown").forEach((d) => d.classList.add("hidden"));
+    document.querySelectorAll(".model-slot-dropdown, .custom-dropdown-menu").forEach((d) => d.classList.add("hidden"));
   });
 }
 
@@ -1256,21 +1325,17 @@ async function generateAudio() {
     return;
   }
 
-  const voiceSelect = $("#voice-select") as HTMLSelectElement;
-  const voiceValue = voiceSelect.value;
+  const voiceValue = getDropdownValue("voice-dropdown");
   const isBuiltInSpeaker = voiceValue.startsWith("speaker:");
   const speakerName = isBuiltInSpeaker ? voiceValue.slice("speaker:".length) : null;
   const voiceId = isBuiltInSpeaker ? null : (voiceValue || null);
 
-  const languageSelect = $("#language-select") as HTMLSelectElement;
-  const language = languageSelect.value;
+  const language = getDropdownValue("language-dropdown");
 
   const instructionInput = $("#voice-instruction") as HTMLInputElement;
   const instruction = (isBuiltInSpeaker && !instructionInput.disabled && instructionInput.value.trim())
     ? instructionInput.value.trim() : null;
 
-  const prefixInput = $("#output-prefix") as HTMLInputElement;
-  const prefix = prefixInput.value.trim() || "audio";
 
   const btn = $("#btn-generate") as HTMLButtonElement;
   const btnLabel = btn.querySelector(".btn-generate-label") as HTMLElement;
@@ -1311,7 +1376,6 @@ async function generateAudio() {
         voice_id: voiceId,
         speaker: speakerName,
         instruction,
-        output_prefix: prefix,
         ...genKwargs,
       };
       console.log("Batch generate request:", body);
@@ -1332,7 +1396,7 @@ async function generateAudio() {
       btn.disabled = false;
       btn.classList.remove("generating", "generate-error");
       btnFill.style.width = "0%";
-      btnLabel.textContent = "Generate Audio";
+      btnLabel.textContent = "Generate";
     }, 2000);
   }
 }
@@ -1633,18 +1697,6 @@ function setupEventListeners() {
   $("#btn-create-design")?.addEventListener("click", createDesignedVoice);
   $("#btn-create-clone")?.addEventListener("click", createClonedVoice);
 
-  $("#voice-select")?.addEventListener("change", (e) => {
-    const select = e.target as HTMLSelectElement;
-    const value = select.value;
-    // Built-in speakers don't use selectVoice (they aren't voice profiles)
-    if (value.startsWith("speaker:")) {
-      selectedVoiceId = null;
-      updateVoiceList();
-    } else {
-      selectVoice(value || null);
-    }
-    updateInstructionRow();
-  });
 
   $("#btn-generate")?.addEventListener("click", generateAudio);
 
@@ -1669,6 +1721,18 @@ async function init() {
   setupScriptEditor();
   setupCloneAudioUpload();
   setupAdvancedSettings();
+
+  // Custom dropdowns for voice and language
+  setupCustomDropdown("voice-dropdown", (value) => {
+    if (value.startsWith("speaker:")) {
+      selectedVoiceId = null;
+      updateVoiceList();
+    } else {
+      selectVoice(value || null);
+    }
+    updateInstructionRow();
+  });
+  setupCustomDropdown("language-dropdown");
 
   // Small delay to ensure RPC is ready
   await new Promise((resolve) => setTimeout(resolve, 500));
