@@ -658,8 +658,8 @@ function openVoiceCloneModal() {
   ($("#clone-voice-name") as HTMLInputElement).value = "";
   ($("#clone-voice-text") as HTMLTextAreaElement).value = "";
   cloneAudioFile = null;
-  hide("#clone-audio-preview");
-  $(".file-upload-content")!.classList.remove("hidden");
+  show("#clone-audio-upload");
+  hide("#clone-audio-preview-row");
 }
 
 function closeVoiceCloneModal() {
@@ -695,14 +695,18 @@ function setupCloneAudioUpload() {
       handleCloneAudioFile(fileInput.files[0]);
     }
   });
+
+  $("#clone-audio-change")?.addEventListener("click", () => {
+    fileInput.click();
+  });
 }
 
 function handleCloneAudioFile(file: File) {
   cloneAudioFile = file;
   const preview = $("#clone-audio-preview") as HTMLAudioElement;
   preview.src = URL.createObjectURL(file);
-  show(preview);
-  $(".file-upload-content")!.classList.add("hidden");
+  hide("#clone-audio-upload");
+  show("#clone-audio-preview-row");
 }
 
 async function createClonedVoice() {

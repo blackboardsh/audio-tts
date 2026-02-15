@@ -680,9 +680,16 @@ body {
     font-size: 0.875rem;
 }
 
-.file-upload audio {
-    width: 100%;
-    margin-top: 16px;
+.clone-audio-preview-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.clone-audio-preview-row audio {
+    flex: 1;
+    min-width: 0;
 }
 
 /* ========== Modal ========== */
