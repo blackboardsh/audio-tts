@@ -1240,8 +1240,8 @@ function setupDropdowns() {
     });
   });
 
-  // Option clicks
-  document.querySelectorAll(".dropdown-option").forEach((opt) => {
+  // Option clicks (scoped to model-slot dropdowns only)
+  document.querySelectorAll(".model-slot-dropdown .dropdown-option").forEach((opt) => {
     opt.addEventListener("click", (e) => {
       e.stopPropagation();
       const dropdown = (opt as HTMLElement).closest(".model-slot-dropdown") as HTMLElement;
