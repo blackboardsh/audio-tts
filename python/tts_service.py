@@ -20,6 +20,15 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+# Default generation kwargs for tighter sampling
+DEFAULT_GENERATION_KWARGS = {
+    "temperature": 0.7,
+    "top_p": 0.9,
+    "top_k": 50,
+    "repetition_penalty": 1.1,
+    "max_new_tokens": 2048,
+}
+
 # Model registry
 AVAILABLE_MODELS = {
     "base_0.6B": {
@@ -652,11 +661,15 @@ class TTSService:
         voice_name: str,
         instruction: str,
         sample_text: str,
-        language: str = "English"
+        language: str = "English",
+        **generation_kwargs
     ) -> VoiceProfile:
         """Design a new voice from text instructions."""
         if self.voice_design_model is None:
             raise RuntimeError("Voice design model not loaded. Load the voice design model first.")
+
+        # Merge defaults with caller overrides
+        gen_kwargs = {**DEFAULT_GENERATION_KWARGS, **generation_kwargs}
 
         # Generate unique ID
         voice_id = str(uuid.uuid4())[:8]
@@ -665,7 +678,8 @@ class TTSService:
         wavs, sr = self.voice_design_model.generate_voice_design(
             text=sample_text,
             language=language,
-            instruct=instruction
+            instruct=instruction,
+            **gen_kwargs
         )
 
         # Save the sample audio
@@ -721,11 +735,16 @@ class TTSService:
         text: str,
         speaker: str,
         language: str = "English",
-        instruction: Optional[str] = None
+        instruction: Optional[str] = None,
+        **generation_kwargs
     ) -> Path:
         """Generate audio using the custom voice model with a predefined speaker."""
         if self.custom_voice_model is None:
             raise RuntimeError("Custom voice model not loaded.")
+
+        # Merge defaults with caller overrides
+        gen_kwargs = {**DEFAULT_GENERATION_KWARGS, **generation_kwargs}
+        logger.info(f"generate_custom() params: text={text[:80]!r}, speaker={speaker}, language={language}, instruction={instruction!r}, gen_kwargs={gen_kwargs}")
 
         output_filename = f"output_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}.wav"
         output_path = self.output_dir / output_filename
@@ -734,6 +753,7 @@ class TTSService:
             "text": text,
             "speaker": speaker,
             "language": language,
+            **gen_kwargs,
         }
         if instruction:
             kwargs["instruct"] = instruction
@@ -752,11 +772,16 @@ class TTSService:
         speaker: str,
         language: str = "English",
         instruction: Optional[str] = None,
-        output_prefix: str = "audio"
+        output_prefix: str = "audio",
+        **generation_kwargs
     ) -> List[Path]:
         """Batch generate audio using the custom voice model with a predefined speaker."""
         if self.custom_voice_model is None:
             raise RuntimeError("Custom voice model not loaded.")
+
+        # Merge defaults with caller overrides
+        gen_kwargs = {**DEFAULT_GENERATION_KWARGS, **generation_kwargs}
+        logger.info(f"batch_generate_custom() params: {len(texts)} texts, speaker={speaker}, language={language}, instruction={instruction!r}, gen_kwargs={gen_kwargs}")
 
         output_paths = []
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -765,6 +790,7 @@ class TTSService:
             "text": texts,
             "speaker": [speaker] * len(texts),
             "language": [language] * len(texts),
+            **gen_kwargs,
         }
         if instruction:
             kwargs["instruct"] = [instruction] * len(texts)
@@ -844,11 +870,16 @@ class TTSService:
         self,
         text: str,
         language: str = "English",
-        voice_id: Optional[str] = None
+        voice_id: Optional[str] = None,
+        **generation_kwargs
     ) -> Path:
         """Generate audio from text."""
         if self.base_model is None:
             raise RuntimeError("Base model not loaded. Load a base model first.")
+
+        # Merge defaults with caller overrides
+        gen_kwargs = {**DEFAULT_GENERATION_KWARGS, **generation_kwargs}
+        logger.info(f"generate() params: text={text[:80]!r}, language={language}, voice_id={voice_id}, gen_kwargs={gen_kwargs}")
 
         # Generate unique output filename
         output_filename = f"output_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}.wav"
@@ -860,7 +891,8 @@ class TTSService:
             wavs, sr = self.base_model.generate_voice_clone(
                 text=text,
                 language=language,
-                voice_clone_prompt=voice_clone_prompt
+                voice_clone_prompt=voice_clone_prompt,
+                **gen_kwargs
             )
         else:
             # Generate with default voice using local reference audio
@@ -871,7 +903,8 @@ class TTSService:
                 text=text,
                 language=language,
                 ref_audio=str(ref_path),
-                ref_text=ref_text
+                ref_text=ref_text,
+                **gen_kwargs
             )
 
         sf.write(str(output_path), wavs[0], sr)
@@ -886,11 +919,16 @@ class TTSService:
         texts: List[str],
         language: str = "English",
         voice_id: Optional[str] = None,
-        output_prefix: str = "audio"
+        output_prefix: str = "audio",
+        **generation_kwargs
     ) -> List[Path]:
         """Generate multiple audio files from a list of texts."""
         if self.base_model is None:
             raise RuntimeError("Base model not loaded. Load a base model first.")
+
+        # Merge defaults with caller overrides
+        gen_kwargs = {**DEFAULT_GENERATION_KWARGS, **generation_kwargs}
+        logger.info(f"batch_generate() params: {len(texts)} texts, language={language}, voice_id={voice_id}, gen_kwargs={gen_kwargs}")
 
         output_paths = []
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -907,7 +945,8 @@ class TTSService:
             wavs, sr = self.base_model.generate_voice_clone(
                 text=texts,
                 language=languages,
-                voice_clone_prompt=voice_clone_prompt
+                voice_clone_prompt=voice_clone_prompt,
+                **gen_kwargs
             )
         else:
             # Use local default reference audio
@@ -918,7 +957,8 @@ class TTSService:
                 text=texts,
                 language=languages,
                 ref_audio=str(ref_path),
-                ref_text=ref_text
+                ref_text=ref_text,
+                **gen_kwargs
             )
 
         # Save each output

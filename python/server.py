@@ -85,6 +85,9 @@ class GenerateRequest(BaseModel):
     voice_id: Optional[str] = None
     speaker: Optional[str] = None
     instruction: Optional[str] = None
+    temperature: Optional[float] = None
+    top_p: Optional[float] = None
+    repetition_penalty: Optional[float] = None
 
 
 class BatchGenerateRequest(BaseModel):
@@ -94,6 +97,9 @@ class BatchGenerateRequest(BaseModel):
     speaker: Optional[str] = None
     instruction: Optional[str] = None
     output_prefix: str = "audio"
+    temperature: Optional[float] = None
+    top_p: Optional[float] = None
+    repetition_penalty: Optional[float] = None
 
 
 class VoiceDesignRequest(BaseModel):
@@ -379,11 +385,23 @@ async def design_voice(request: VoiceDesignRequest):
 
 # --- TTS Generation Endpoints ---
 
+def _extract_generation_kwargs(request) -> dict:
+    """Extract non-None generation kwargs from a request."""
+    kwargs = {}
+    for key in ("temperature", "top_p", "repetition_penalty"):
+        val = getattr(request, key, None)
+        if val is not None:
+            kwargs[key] = val
+    return kwargs
+
+
 @app.post("/generate")
 async def generate_audio(request: GenerateRequest):
     """Generate audio from text."""
     if not tts_service:
         raise HTTPException(status_code=503, detail="Service not initialized")
+
+    gen_kwargs = _extract_generation_kwargs(request)
 
     try:
         if request.speaker and tts_service.custom_voice_model is not None:
@@ -392,14 +410,16 @@ async def generate_audio(request: GenerateRequest):
                 request.text,
                 request.speaker,
                 request.language,
-                request.instruction
+                request.instruction,
+                **gen_kwargs
             )
         else:
             output_path = await asyncio.to_thread(
                 tts_service.generate,
                 request.text,
                 request.language,
-                request.voice_id
+                request.voice_id,
+                **gen_kwargs
             )
 
         return {
@@ -418,6 +438,8 @@ async def batch_generate_audio(request: BatchGenerateRequest):
     if not tts_service:
         raise HTTPException(status_code=503, detail="Service not initialized")
 
+    gen_kwargs = _extract_generation_kwargs(request)
+
     try:
         if request.speaker and tts_service.custom_voice_model is not None:
             output_paths = await asyncio.to_thread(
@@ -426,7 +448,8 @@ async def batch_generate_audio(request: BatchGenerateRequest):
                 request.speaker,
                 request.language,
                 request.instruction,
-                request.output_prefix
+                request.output_prefix,
+                **gen_kwargs
             )
         else:
             output_paths = await asyncio.to_thread(
@@ -434,7 +457,8 @@ async def batch_generate_audio(request: BatchGenerateRequest):
                 request.texts,
                 request.language,
                 request.voice_id,
-                request.output_prefix
+                request.output_prefix,
+                **gen_kwargs
             )
 
         return {

@@ -395,6 +395,66 @@ body {
     cursor: not-allowed;
 }
 
+/* ========== Advanced Settings ========== */
+.advanced-settings {
+    margin-top: 12px;
+    gap: 24px;
+}
+
+.slider-group {
+    flex: 1;
+    min-width: 0;
+}
+
+.slider-value {
+    font-weight: 600;
+    color: var(--accent-primary);
+    margin-left: 4px;
+}
+
+.range-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--bg-tertiary);
+    outline: none;
+    cursor: pointer;
+}
+
+.range-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent-primary);
+    cursor: pointer;
+    border: 2px solid var(--bg-secondary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.range-slider::-webkit-slider-thumb:hover {
+    background: var(--accent-primary-hover);
+}
+
+.range-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent-primary);
+    cursor: pointer;
+    border: 2px solid var(--bg-secondary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.range-slider::-moz-range-track {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--bg-tertiary);
+}
+
 .progress-container {
     margin-top: 16px;
 }

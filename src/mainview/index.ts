@@ -1204,6 +1204,35 @@ function setupScriptEditor() {
   });
 }
 
+// ========== Advanced Settings ==========
+
+function setupAdvancedSettings() {
+  const sliders = [
+    { id: "slider-temperature", valId: "val-temperature" },
+    { id: "slider-top-p", valId: "val-top-p" },
+    { id: "slider-repetition-penalty", valId: "val-repetition-penalty" },
+  ];
+
+  for (const { id, valId } of sliders) {
+    const slider = $(`#${id}`) as HTMLInputElement;
+    const valEl = $(`#${valId}`)!;
+    slider.addEventListener("input", () => {
+      valEl.textContent = slider.value;
+    });
+  }
+}
+
+function getGenerationKwargs(): Record<string, number> {
+  const kwargs: Record<string, number> = {};
+  const temp = ($("#slider-temperature") as HTMLInputElement)?.value;
+  const topP = ($("#slider-top-p") as HTMLInputElement)?.value;
+  const repPenalty = ($("#slider-repetition-penalty") as HTMLInputElement)?.value;
+  if (temp) kwargs.temperature = parseFloat(temp);
+  if (topP) kwargs.top_p = parseFloat(topP);
+  if (repPenalty) kwargs.repetition_penalty = parseFloat(repPenalty);
+  return kwargs;
+}
+
 // ========== Audio Generation ==========
 
 async function generateAudio() {
@@ -1251,32 +1280,40 @@ async function generateAudio() {
   progressFill.style.width = "0%";
   progressText.textContent = "Preparing...";
 
+  const genKwargs = getGenerationKwargs();
+
   try {
     if (lines.length === 1) {
       progressText.textContent = "Generating audio...";
       progressFill.style.width = "50%";
 
-      await backendRequest("POST", "/generate", {
+      const body = {
         text: lines[0],
         language,
         voice_id: voiceId,
         speaker: speakerName,
         instruction,
-      });
+        ...genKwargs,
+      };
+      console.log("Generate request:", body);
+      await backendRequest("POST", "/generate", body);
 
       progressFill.style.width = "100%";
       progressText.textContent = "Complete!";
     } else {
       progressText.textContent = `Generating ${lines.length} audio files...`;
 
-      await backendRequest("POST", "/generate/batch", {
+      const body = {
         texts: lines,
         language,
         voice_id: voiceId,
         speaker: speakerName,
         instruction,
         output_prefix: prefix,
-      });
+        ...genKwargs,
+      };
+      console.log("Batch generate request:", body);
+      await backendRequest("POST", "/generate/batch", body);
 
       progressFill.style.width = "100%";
       progressText.textContent = `Generated ${lines.length} files!`;
@@ -1607,6 +1644,7 @@ async function init() {
   setupDropdowns();
   setupScriptEditor();
   setupCloneAudioUpload();
+  setupAdvancedSettings();
 
   // Small delay to ensure RPC is ready
   await new Promise((resolve) => setTimeout(resolve, 500));
