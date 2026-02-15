@@ -46,6 +46,8 @@ interface OutputFile {
   path: string;
   size: number;
   modified: number;
+  prompt?: string;
+  created_at?: string;
 }
 
 // ========== RPC Schema (matching bun side) ==========
@@ -1364,7 +1366,8 @@ function updateOutputList() {
     <div class="output-item" data-filename="${escapeHtml(file.filename)}">
       <div class="output-item-info">
         <div class="output-item-name">${escapeHtml(file.filename)}</div>
-        <div class="output-item-meta">${formatFileSize(file.size)}</div>
+        <div class="output-item-meta">${formatFileSize(file.size)}${file.created_at ? " &middot; " + formatDate(file.created_at) : ""}</div>
+        ${file.prompt ? `<div class="output-item-prompt" title="${escapeHtml(file.prompt)}">${escapeHtml(file.prompt)}</div>` : ""}
       </div>
       <audio controls src="${backendUrl}/audio/${encodeURIComponent(file.filename)}"></audio>
       <div class="output-item-actions">
@@ -1445,6 +1448,22 @@ function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatDate(isoString: string): string {
+  try {
+    const d = new Date(isoString);
+    const now = new Date();
+    const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+    // If today, just show time
+    if (d.toDateString() === now.toDateString()) return time;
+    // If this year, show month/day + time
+    const date = d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    if (d.getFullYear() === now.getFullYear()) return `${date} ${time}`;
+    return `${d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })} ${time}`;
+  } catch {
+    return "";
+  }
 }
 
 // ========== Modal Helpers ==========

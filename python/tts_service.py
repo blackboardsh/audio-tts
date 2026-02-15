@@ -165,6 +165,10 @@ class TTSService:
         # Use float32 for MPS - float16 causes numerical instability (inf/nan in softmax)
         self.dtype = torch.float32 if self.device == "mps" else torch.float16
 
+        # Output metadata index (filename -> {prompt, created_at, ...})
+        self._output_metadata: Dict[str, dict] = {}
+        self._load_output_metadata()
+
         # Load existing voice profiles
         self._load_voice_profiles()
 
@@ -204,6 +208,49 @@ class TTSService:
                 json.dump(data, f, indent=2)
         except Exception as e:
             logger.error(f"Failed to save voice profiles: {e}")
+
+    def _load_output_metadata(self):
+        """Load output metadata index from disk."""
+        meta_file = self.output_dir / "metadata.json"
+        if meta_file.exists():
+            try:
+                with open(meta_file) as f:
+                    self._output_metadata = json.load(f)
+            except Exception as e:
+                logger.error(f"Failed to load output metadata: {e}")
+                self._output_metadata = {}
+
+    def _save_output_metadata(self):
+        """Save output metadata index to disk."""
+        meta_file = self.output_dir / "metadata.json"
+        try:
+            with open(meta_file, "w") as f:
+                json.dump(self._output_metadata, f, indent=2)
+        except Exception as e:
+            logger.error(f"Failed to save output metadata: {e}")
+
+    def _record_output_metadata(self, filename: str, text: str, **extra):
+        """Record metadata for a generated output file."""
+        self._output_metadata[filename] = {
+            "prompt": text,
+            "created_at": datetime.now().isoformat(),
+            **extra,
+        }
+        self._save_output_metadata()
+
+    def get_output_metadata(self, filename: str) -> Optional[dict]:
+        """Get metadata for a specific output file."""
+        return self._output_metadata.get(filename)
+
+    def get_all_output_metadata(self) -> Dict[str, dict]:
+        """Get all output metadata."""
+        return dict(self._output_metadata)
+
+    def delete_output_metadata(self, filename: str):
+        """Remove metadata for a deleted output file."""
+        if filename in self._output_metadata:
+            del self._output_metadata[filename]
+            self._save_output_metadata()
 
     def get_available_models(self) -> List[dict]:
         """Get list of all available models."""
@@ -762,6 +809,10 @@ class TTSService:
         sf.write(str(output_path), wavs[0], sr)
         del wavs
         self._clear_memory_cache()
+        self._record_output_metadata(
+            output_path.name, text,
+            language=language, speaker=speaker, instruction=instruction,
+        )
         logger.info(f"Generated custom voice audio: {output_path}")
 
         return output_path
@@ -802,6 +853,10 @@ class TTSService:
             output_path = self.output_dir / output_filename
             sf.write(str(output_path), wav, sr)
             output_paths.append(output_path)
+            self._record_output_metadata(
+                output_filename, texts[i],
+                language=language, speaker=speaker, instruction=instruction,
+            )
             logger.info(f"Generated custom voice audio: {output_path}")
 
         del wavs
@@ -910,6 +965,10 @@ class TTSService:
         sf.write(str(output_path), wavs[0], sr)
         del wavs
         self._clear_memory_cache()
+        self._record_output_metadata(
+            output_path.name, text,
+            language=language, voice_id=voice_id,
+        )
         logger.info(f"Generated audio: {output_path}")
 
         return output_path
@@ -967,6 +1026,10 @@ class TTSService:
             output_path = self.output_dir / output_filename
             sf.write(str(output_path), wav, sr)
             output_paths.append(output_path)
+            self._record_output_metadata(
+                output_filename, texts[i],
+                language=language, voice_id=voice_id,
+            )
             logger.info(f"Generated audio: {output_path}")
 
         del wavs

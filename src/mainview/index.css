@@ -522,6 +522,16 @@ body {
     color: var(--text-secondary);
 }
 
+.output-item-prompt {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 400px;
+    margin-top: 2px;
+}
+
 .output-item audio {
     height: 32px;
     width: 200px;

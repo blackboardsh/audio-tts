@@ -504,14 +504,23 @@ async def get_voice_audio_file(filename: str):
 @app.get("/output")
 async def list_output_files():
     """List all generated audio files."""
+    if not tts_service:
+        raise HTTPException(status_code=503, detail="Service not initialized")
+
+    all_metadata = tts_service.get_all_output_metadata()
     files = []
     for f in OUTPUT_DIR.glob("*.wav"):
-        files.append({
+        entry = {
             "filename": f.name,
             "path": str(f),
             "size": f.stat().st_size,
-            "modified": f.stat().st_mtime
-        })
+            "modified": f.stat().st_mtime,
+        }
+        meta = all_metadata.get(f.name)
+        if meta:
+            entry["prompt"] = meta.get("prompt")
+            entry["created_at"] = meta.get("created_at")
+        files.append(entry)
     return {"files": sorted(files, key=lambda x: x["modified"], reverse=True)}
 
 
@@ -523,6 +532,8 @@ async def delete_output_file(filename: str):
         raise HTTPException(status_code=404, detail="File not found")
 
     file_path.unlink()
+    if tts_service:
+        tts_service.delete_output_metadata(filename)
     return {"status": "deleted", "filename": filename}
 
 
