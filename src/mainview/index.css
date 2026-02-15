@@ -455,28 +455,45 @@ body {
     background: var(--bg-tertiary);
 }
 
-.progress-container {
-    margin-top: 16px;
-}
-
-.progress-bar {
-    height: 8px;
-    background: var(--bg-tertiary);
-    border-radius: 4px;
+/* ========== Generate Button with Inline Progress ========== */
+.btn-generate {
+    position: relative;
     overflow: hidden;
+    min-width: 180px;
 }
 
-.progress-fill {
+.btn-generate-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
     height: 100%;
-    background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
-    transition: width 0.3s ease;
+    width: 0%;
+    background: rgba(255, 255, 255, 0.15);
+    transition: width 0.4s ease;
+    pointer-events: none;
 }
 
-.progress-text {
-    display: block;
-    margin-top: 8px;
-    font-size: 0.8rem;
-    color: var(--text-secondary);
+.btn-generate-label {
+    position: relative;
+    z-index: 1;
+    pointer-events: none;
+}
+
+.btn-generate.generating {
+    background: var(--accent-primary);
+    cursor: wait;
+}
+
+.btn-generate.generating .btn-generate-fill {
+    background: linear-gradient(90deg, rgba(255,255,255,0.1), rgba(255,255,255,0.25));
+}
+
+.btn-generate.generate-error {
+    background: var(--accent-danger);
+}
+
+.btn-generate.generate-error .btn-generate-fill {
+    background: transparent;
 }
 
 /* ========== Output Section ========== */

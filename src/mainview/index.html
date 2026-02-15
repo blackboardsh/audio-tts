@@ -150,7 +150,10 @@ Let's get started!"
                                 <label>Output Prefix</label>
                                 <input type="text" id="output-prefix" class="input" value="audio" placeholder="audio">
                             </div>
-                            <button id="btn-generate" class="btn btn-primary btn-large">Generate Audio</button>
+                            <button id="btn-generate" class="btn btn-primary btn-large btn-generate">
+                                <span class="btn-generate-fill"></span>
+                                <span class="btn-generate-label">Generate Audio</span>
+                            </button>
                         </div>
                         <div class="control-row instruction-row hidden" id="instruction-row">
                             <div class="control-group" style="flex:1">
@@ -172,12 +175,6 @@ Let's get started!"
                                 <label>Repetition Penalty <span class="slider-value" id="val-repetition-penalty">1.1</span></label>
                                 <input type="range" id="slider-repetition-penalty" min="1.0" max="1.5" step="0.05" value="1.1" class="range-slider">
                             </div>
-                        </div>
-                        <div id="generation-progress" class="progress-container hidden">
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: 0%"></div>
-                            </div>
-                            <span class="progress-text">Generating...</span>
                         </div>
                     </div>
 

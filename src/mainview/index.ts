@@ -1273,25 +1273,20 @@ async function generateAudio() {
   const prefix = prefixInput.value.trim() || "audio";
 
   const btn = $("#btn-generate") as HTMLButtonElement;
-  const progressContainer = $("#generation-progress")!;
-  const progressFill = progressContainer.querySelector(
-    ".progress-fill"
-  ) as HTMLElement;
-  const progressText = progressContainer.querySelector(
-    ".progress-text"
-  ) as HTMLElement;
+  const btnLabel = btn.querySelector(".btn-generate-label") as HTMLElement;
+  const btnFill = btn.querySelector(".btn-generate-fill") as HTMLElement;
 
   btn.disabled = true;
-  show(progressContainer);
-  progressFill.style.width = "0%";
-  progressText.textContent = "Preparing...";
+  btn.classList.add("generating");
+  btnFill.style.width = "0%";
+  btnLabel.textContent = "Preparing...";
 
   const genKwargs = getGenerationKwargs();
 
   try {
     if (lines.length === 1) {
-      progressText.textContent = "Generating audio...";
-      progressFill.style.width = "50%";
+      btnLabel.textContent = "Generating...";
+      btnFill.style.width = "15%";
 
       const body = {
         text: lines[0],
@@ -1304,10 +1299,11 @@ async function generateAudio() {
       console.log("Generate request:", body);
       await backendRequest("POST", "/generate", body);
 
-      progressFill.style.width = "100%";
-      progressText.textContent = "Complete!";
+      btnFill.style.width = "100%";
+      btnLabel.textContent = "Complete!";
     } else {
-      progressText.textContent = `Generating ${lines.length} audio files...`;
+      btnLabel.textContent = `Generating ${lines.length} files...`;
+      btnFill.style.width = "15%";
 
       const body = {
         texts: lines,
@@ -1321,18 +1317,23 @@ async function generateAudio() {
       console.log("Batch generate request:", body);
       await backendRequest("POST", "/generate/batch", body);
 
-      progressFill.style.width = "100%";
-      progressText.textContent = `Generated ${lines.length} files!`;
+      btnFill.style.width = "100%";
+      btnLabel.textContent = `Generated ${lines.length} files!`;
     }
 
     await loadOutputFiles();
     updateOutputList();
   } catch (e) {
     console.error("Failed to generate audio:", e);
-    progressText.textContent = `Error: ${e}`;
+    btnLabel.textContent = "Error!";
+    btn.classList.add("generate-error");
   } finally {
-    btn.disabled = false;
-    setTimeout(() => hide(progressContainer), 3000);
+    setTimeout(() => {
+      btn.disabled = false;
+      btn.classList.remove("generating", "generate-error");
+      btnFill.style.width = "0%";
+      btnLabel.textContent = "Generate Audio";
+    }, 2000);
   }
 }
 
