@@ -519,6 +519,15 @@ class TTSService:
         logger.info(f"=== Model {model_id} loaded successfully ===")
         return model_id
 
+    def _clear_memory_cache(self):
+        """Force garbage collection and clear GPU/MPS memory caches."""
+        import gc
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        if torch.backends.mps.is_available():
+            torch.mps.empty_cache()
+
     def unload_models(self):
         """Unload all models from memory."""
         self.base_model = None
@@ -528,12 +537,7 @@ class TTSService:
         self.voice_clone_prompts.clear()
         self._loaded_model_sizes.clear()
 
-        # Force garbage collection
-        import gc
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-
+        self._clear_memory_cache()
         logger.info("All models unloaded")
 
     def unload_model(self, model_type: str):
@@ -554,11 +558,7 @@ class TTSService:
         if not any([self.base_model, self.voice_design_model, self.custom_voice_model]):
             self.tokenizer = None
 
-        import gc
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-
+        self._clear_memory_cache()
         logger.info(f"Model slot '{model_type}' unloaded")
 
     def get_loaded_models_detail(self) -> Dict[str, str]:
@@ -673,6 +673,9 @@ class TTSService:
         sample_path = self.voices_dir / sample_filename
         sf.write(str(sample_path), wavs[0], sr)
 
+        del wavs
+        self._clear_memory_cache()
+
         # Now create a clone prompt from the designed voice
         if self.base_model is not None:
             try:
@@ -737,6 +740,8 @@ class TTSService:
 
         wavs, sr = self.custom_voice_model.generate_custom_voice(**kwargs)
         sf.write(str(output_path), wavs[0], sr)
+        del wavs
+        self._clear_memory_cache()
         logger.info(f"Generated custom voice audio: {output_path}")
 
         return output_path
@@ -772,6 +777,9 @@ class TTSService:
             sf.write(str(output_path), wav, sr)
             output_paths.append(output_path)
             logger.info(f"Generated custom voice audio: {output_path}")
+
+        del wavs
+        self._clear_memory_cache()
 
         return output_paths
 
@@ -867,6 +875,8 @@ class TTSService:
             )
 
         sf.write(str(output_path), wavs[0], sr)
+        del wavs
+        self._clear_memory_cache()
         logger.info(f"Generated audio: {output_path}")
 
         return output_path
@@ -918,6 +928,9 @@ class TTSService:
             sf.write(str(output_path), wav, sr)
             output_paths.append(output_path)
             logger.info(f"Generated audio: {output_path}")
+
+        del wavs
+        self._clear_memory_cache()
 
         return output_paths
 

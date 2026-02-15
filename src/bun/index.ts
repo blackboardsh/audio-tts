@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { type Subprocess, spawn } from "bun";
-import {
+import Electrobun, {
 	ApplicationMenu,
 	BrowserView,
 	BrowserWindow,
@@ -480,10 +480,26 @@ async function startBackend(): Promise<boolean> {
 
 async function stopBackend(): Promise<void> {
 	if (backendProcess) {
-		console.log("Stopping backend...");
-		backendProcess.kill();
+		const proc = backendProcess;
 		backendProcess = null;
 		backendReady = false;
+
+		console.log("Stopping backend (SIGTERM)...");
+		proc.kill();
+
+		// Wait up to 3 seconds for graceful shutdown, then SIGKILL
+		const exited = await Promise.race([
+			proc.exited.then(() => true),
+			new Promise<false>((resolve) => setTimeout(() => resolve(false), 3000)),
+		]);
+
+		if (!exited) {
+			console.log("Backend did not exit in time, sending SIGKILL...");
+			proc.kill(9);
+			await proc.exited;
+		}
+
+		console.log("Backend stopped");
 	}
 }
 
@@ -715,6 +731,13 @@ mainWindow.webview.on("dom-ready", () => {
 mainWindow.on("close", async () => {
 	await stopBackend();
 	Utils.quit();
+});
+
+// Safety net: kill backend on any quit path (Cmd+Q, Ctrl+C, etc.)
+Electrobun.events.on("before-quit", () => {
+	if (backendProcess) {
+		backendProcess.kill(9);
+	}
 });
 
 // Start setup automatically
