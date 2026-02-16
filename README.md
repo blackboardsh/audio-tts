@@ -1,6 +1,6 @@
 # Audio TTS
 
-Desktop text-to-speech app using Qwen3-TTS for voice design, cloning, and generation.
+Desktop text-to-speech app using Qwen3-TTS for 100% local voice design, cloning, and generation. Built with [Electrobun](https://github.com/blackboardsh/electrobun).
 
 ## Demo
 
@@ -32,6 +32,4 @@ All models are downloaded automatically on first use — just select a model siz
 | **Create Voice Design/Clone** | Create voices from text descriptions | Only when designing a new voice, can unload after |
 | **Built-in Instruct Voices** | Predefined speakers + instruction control | Only when using built-in speakers |
 
----
 
-Built with [Electrobun](https://github.com/blackboardsh/electrobun)
