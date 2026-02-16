@@ -2,6 +2,10 @@
 
 Desktop text-to-speech app using Qwen3-TTS for voice design, cloning, and generation.
 
+## Demo
+
+[![Audio TTS Demo](https://img.youtube.com/vi/Z4dNK1d6l6E/maxresdefault.jpg)](https://www.youtube.com/watch?v=Z4dNK1d6l6E)
+
 ## Download
 
 **macOS (Apple Silicon):**
